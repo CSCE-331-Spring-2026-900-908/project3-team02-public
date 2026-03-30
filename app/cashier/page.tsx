@@ -10,6 +10,13 @@ interface MenuItem {
   category: string
 }
 
+interface OrderItem {
+  itemId: number
+  itemName: string
+  price: number
+  qty: number
+}
+
 const CATEGORIES = ['All', 'Milk Tea', 'Fruit Tea', 'Slush', 'Special']
 
 const MENU_ITEMS: MenuItem[] = [
@@ -31,11 +38,34 @@ const MENU_ITEMS: MenuItem[] = [
 
 export default function CashierPage() {
   const [activeCategory, setActiveCategory] = useState<string>('All')
+  const [cart, setCart] = useState<OrderItem[]>([])
 
   const visibleItems =
     activeCategory === 'All'
       ? MENU_ITEMS
       : MENU_ITEMS.filter(item => item.category === activeCategory)
+
+  const orderTotal = cart.reduce((sum, o) => sum + o.price * o.qty, 0)
+
+  function addToCart(item: MenuItem) {
+    setCart(prev => {
+      const existing = prev.find(o => o.itemId === item.id)
+      if (existing) {
+        return prev.map(o =>
+          o.itemId === item.id ? { ...o, qty: o.qty + 1 } : o
+        )
+      }
+      return [...prev, { itemId: item.id, itemName: item.name, price: item.price, qty: 1 }]
+    })
+  }
+
+  function removeFromCart(itemId: number) {
+    setCart(prev =>
+      prev
+        .map(o => (o.itemId === itemId ? { ...o, qty: o.qty - 1 } : o))
+        .filter(o => o.qty > 0)
+    )
+  }
 
   return (
     <div className="flex h-screen bg-white font-sans">
@@ -72,6 +102,7 @@ export default function CashierPage() {
             {visibleItems.map(item => (
               <button
                 key={item.id}
+                onClick={() => addToCart(item)}
                 className="rounded-2xl bg-gray-50 border border-gray-200 p-4 text-left
                            hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer"
               >
@@ -88,8 +119,38 @@ export default function CashierPage() {
         <div className="px-4 py-4 border-b border-gray-200">
           <h2 className="font-semibold text-gray-800">Order</h2>
         </div>
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-sm text-gray-400">No items added</p>
+
+        <div className="flex-1 overflow-y-auto px-4 py-2 space-y-2">
+          {cart.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center mt-8">No items added</p>
+          ) : (
+            cart.map(item => (
+              <div
+                key={item.itemId}
+                className="flex items-center justify-between rounded-xl bg-white border border-gray-200 px-3 py-2 text-sm"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-gray-800 truncate">{item.itemName}</p>
+                  <p className="text-gray-500">
+                    x{item.qty} &middot; ${(item.price * item.qty).toFixed(2)}
+                  </p>
+                </div>
+                <button
+                  onClick={() => removeFromCart(item.itemId)}
+                  className="ml-2 text-gray-400 hover:text-red-500 text-lg font-bold leading-none cursor-pointer"
+                >
+                  &minus;
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="px-4 py-3 border-t border-gray-200">
+          <div className="flex justify-between text-sm font-semibold text-gray-800">
+            <span>Total</span>
+            <span>${orderTotal.toFixed(2)}</span>
+          </div>
         </div>
       </aside>
     </div>
