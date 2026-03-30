@@ -39,6 +39,8 @@ const MENU_ITEMS: MenuItem[] = [
 export default function CashierPage() {
   const [activeCategory, setActiveCategory] = useState<string>('All')
   const [cart, setCart] = useState<OrderItem[]>([])
+  const [paymentType, setPaymentType] = useState<'Card' | 'Cash'>('Card')
+  const [submitted, setSubmitted] = useState(false)
 
   const visibleItems =
     activeCategory === 'All'
@@ -65,6 +67,17 @@ export default function CashierPage() {
         .map(o => (o.itemId === itemId ? { ...o, qty: o.qty - 1 } : o))
         .filter(o => o.qty > 0)
     )
+  }
+
+  function submitOrder() {
+    if (cart.length === 0) return
+    // Implement actual fetch POST to API in a future sprint
+    const summary = cart.map(o => `${o.itemName} x${o.qty}`).join(', ')
+    alert(`Order submitted!\n${summary}\nPayment: ${paymentType}\nTotal: $${orderTotal.toFixed(2)}`)
+    setCart([])
+    setPaymentType('Card')
+    setSubmitted(true)
+    setTimeout(() => setSubmitted(false), 3000)
   }
 
   return (
@@ -146,11 +159,45 @@ export default function CashierPage() {
           )}
         </div>
 
-        <div className="px-4 py-3 border-t border-gray-200">
+        <div className="px-4 py-3 border-t border-gray-200 space-y-3">
+          {submitted && (
+            <div className="rounded-lg bg-green-100 border border-green-300 text-green-800 text-sm px-3 py-2 text-center font-medium">
+              Order placed successfully!
+            </div>
+          )}
+
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Payment</p>
+            <div className="flex gap-4">
+              {(['Card', 'Cash'] as const).map(type => (
+                <label key={type} className="flex items-center gap-1.5 cursor-pointer text-sm text-gray-700">
+                  <input
+                    type="radio"
+                    name="payment"
+                    value={type}
+                    checked={paymentType === type}
+                    onChange={() => setPaymentType(type)}
+                    className="accent-blue-600"
+                  />
+                  {type}
+                </label>
+              ))}
+            </div>
+          </div>
+
           <div className="flex justify-between text-sm font-semibold text-gray-800">
             <span>Total</span>
             <span>${orderTotal.toFixed(2)}</span>
           </div>
+
+          <button
+            onClick={submitOrder}
+            disabled={cart.length === 0}
+            className="w-full py-2.5 rounded-xl bg-blue-600 text-white font-semibold text-sm
+                       hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+          >
+            Submit Order
+          </button>
         </div>
       </aside>
     </div>
