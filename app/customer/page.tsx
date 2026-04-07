@@ -8,6 +8,7 @@ interface MenuItem {
   itemname: string
   price: number
   category: string
+  description: string
 }
 
 interface OrderItem {
@@ -55,9 +56,9 @@ export default function KioskPage() {
       }
       return [...prev, { itemId: item.itemid, itemName: item.itemname, price: item.price, qty: 1 }]
     })
-    // Show notification and return to categories
+    // Show notification
     setAddedNotification(item.itemname)
-    setSelectedCategory(null)
+    //setSelectedCategory(null) // removing auto redirect according to user study feedback
     setTimeout(() => setAddedNotification(null), 2000)
   }
 
@@ -149,6 +150,9 @@ export default function KioskPage() {
                              hover:border-blue-400 hover:from-blue-50 hover:to-blue-100 transition-all cursor-pointer shadow-sm hover:shadow-md"
                 >
                   <p className="font-bold text-gray-900 text-lg leading-snug">{item.itemname}</p>
+                  {item.description && (
+                    <p className="mt-2 text-gray-600 text-sm line-clamp-2">{item.description}</p>
+                  )}
                   <p className="mt-3 text-blue-600 font-bold text-xl">${item.price.toFixed(2)}</p>
                 </button>
               ))}
