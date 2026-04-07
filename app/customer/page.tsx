@@ -16,6 +16,8 @@ interface OrderItem {
   itemName: string
   price: number
   qty: number
+  customizations?: string
+  cartId: string
 }
 
 export default function KioskPage() {
@@ -25,6 +27,13 @@ export default function KioskPage() {
   const [cart, setCart] = useState<OrderItem[]>([])
   const [submitted, setSubmitted] = useState(false)
   const [addedNotification, setAddedNotification] = useState<string | null>(null)
+  
+  // Customization states
+  const [customizingItem, setCustomizingItem] = useState<MenuItem | null>(null)
+  const [drinkSize, setDrinkSize] = useState('Medium')
+  const [iceLevel, setIceLevel] = useState('Normal Ice')
+  const [sugarLevel, setSugarLevel] = useState('100% Sugar')
+  const [bobaOption, setBobaOption] = useState<'Regular Boba' | 'Extra Boba' | 'No Boba'>('Regular Boba')
 
   useEffect(() => {
     async function fetchItems() {
@@ -82,32 +91,52 @@ export default function KioskPage() {
   const visibleItems = selectedCategory ? items.filter(i => i.category === selectedCategory) : []
   const orderTotal = cart.reduce((sum, o) => sum + o.price * o.qty, 0)
 
-  function addToCart(item: MenuItem) {
-    setCart(prev => {
-      const existing = prev.find(o => o.itemId === item.itemid)
-      if (existing) {
-        return prev.map(o =>
-          o.itemId === item.itemid ? { ...o, qty: o.qty + 1 } : o
-        )
-      }
-      return [...prev, { itemId: item.itemid, itemName: item.itemname, price: item.price, qty: 1 }]
-    })
-    // Show notification
-    setAddedNotification(item.itemname)
-    //setSelectedCategory(null) // removing auto redirect according to user study feedback
-    setTimeout(() => setAddedNotification(null), 2000)
+  function openCustomization(item: MenuItem) {
+    setCustomizingItem(item)
+    setDrinkSize('Medium')
+    setIceLevel('Normal Ice')
+    setSugarLevel('100% Sugar')
+    setBobaOption('Regular Boba')
   }
 
-  function incrementCart(itemId: number) {
+  function confirmCustomization() {
+    if (!customizingItem) return
+    
+    const customString = `${drinkSize}, ${iceLevel}, ${sugarLevel}, ${bobaOption}`
+    const cartId = `${customizingItem.itemid}-${customString}`
+
+    setCart(prev => {
+      const existing = prev.find(o => o.cartId === cartId)
+      if (existing) {
+        return prev.map(o =>
+          o.cartId === cartId ? { ...o, qty: o.qty + 1 } : o
+        )
+      }
+      return [...prev, { 
+        itemId: customizingItem.itemid, 
+        itemName: customizingItem.itemname, 
+        price: customizingItem.price, 
+        qty: 1,
+        customizations: customString,
+        cartId
+      }]
+    })
+
+    setAddedNotification(customizingItem.itemname)
+    setTimeout(() => setAddedNotification(null), 2000)
+    setCustomizingItem(null)
+  }
+
+  function incrementCart(cartId: string) {
     setCart(prev =>
-      prev.map(o => (o.itemId === itemId ? { ...o, qty: o.qty + 1 } : o))
+      prev.map(o => (o.cartId === cartId ? { ...o, qty: o.qty + 1 } : o))
     )
   }
 
-  function removeFromCart(itemId: number) {
+  function removeFromCart(cartId: string) {
     setCart(prev =>
       prev
-        .map(o => (o.itemId === itemId ? { ...o, qty: o.qty - 1 } : o))
+        .map(o => (o.cartId === cartId ? { ...o, qty: o.qty - 1 } : o))
         .filter(o => o.qty > 0)
     )
   }
@@ -123,6 +152,120 @@ export default function KioskPage() {
 
   return (
     <div className="flex h-screen bg-white font-sans">
+      {/* Customization Modal */}
+      {customizingItem && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 w-96 shadow-xl border-2 border-gray-100">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">{customizingItem.itemname}</h2>
+            <p className="text-gray-500 mb-6">Customize your drink</p>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Drink Size</label>
+                <select 
+                  value={drinkSize} 
+                  onChange={(e) => setDrinkSize(e.target.value)}
+                  className="w-full text-black p-3 rounded-lg border border-gray-300 bg-gray-50 focus:ring-2 focus:ring-blue-500"
+                >
+                  <option>Medium</option>
+                  <option>Large</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Ice Level</label>
+                <select 
+                  value={iceLevel} 
+                  onChange={(e) => setIceLevel(e.target.value)}
+                  className="w-full text-black p-3 rounded-lg border border-gray-300 bg-gray-50 focus:ring-2 focus:ring-blue-500"
+                >
+                  <option>Normal Ice</option>
+                  <option>Less Ice</option>
+                  <option>No Ice</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Sugar Level</label>
+                <select 
+                  value={sugarLevel} 
+                  onChange={(e) => setSugarLevel(e.target.value)}
+                  className="w-full text-black p-3 rounded-lg border border-gray-300 bg-gray-50 focus:ring-2 focus:ring-blue-500"
+                >
+                  <option>100% Sugar</option>
+                  <option>75% Sugar</option>
+                  <option>50% Sugar</option>
+                  <option>25% Sugar</option>
+                  <option>0% Sugar</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Boba</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    aria-pressed={bobaOption === 'Regular Boba'}
+                    onClick={() => setBobaOption('Regular Boba')}
+                    className={`rounded-lg border p-3 flex flex-col items-center justify-center transition-colors ${
+                      bobaOption === 'Regular Boba'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <span className="text-xl">🧋</span>
+                    <span className="text-xs mt-1 font-medium">Regular</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    aria-pressed={bobaOption === 'Extra Boba'}
+                    onClick={() => setBobaOption('Extra Boba')}
+                    className={`rounded-lg border p-3 flex flex-col items-center justify-center transition-colors ${
+                      bobaOption === 'Extra Boba'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <span className="text-xl">🧋+</span>
+                    <span className="text-xs mt-1 font-medium">Extra</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    aria-pressed={bobaOption === 'No Boba'}
+                    onClick={() => setBobaOption('No Boba')}
+                    className={`rounded-lg border p-3 flex flex-col items-center justify-center transition-colors ${
+                      bobaOption === 'No Boba'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <span className="text-xl">🚫🧋</span>
+                    <span className="text-xs mt-1 font-medium">None</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-8 flex gap-3">
+              <button 
+                onClick={() => setCustomizingItem(null)}
+                className="flex-1 py-3 rounded-xl bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={confirmCustomization}
+                className="flex-1 py-3 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors cursor-pointer"
+              >
+                Add to Cart
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Notification popup */}
       {addedNotification && (
         <div className="fixed top-8 left-1/2 transform -translate-x-1/2 z-50 animate-bounce">
@@ -182,7 +325,7 @@ export default function KioskPage() {
               {visibleItems.map(item => (
                 <button
                   key={item.itemid}
-                  onClick={() => addToCart(item)}
+                  onClick={() => openCustomization(item)}
                   className="rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-gray-200 p-6 text-left
                              hover:border-blue-400 hover:from-blue-50 hover:to-blue-100 transition-all cursor-pointer shadow-sm hover:shadow-md"
                 >
@@ -212,25 +355,28 @@ export default function KioskPage() {
           ) : (
             cart.map(item => (
               <div
-                key={item.itemId}
+                key={item.cartId}
                 className="flex items-center justify-between rounded-xl bg-white border border-gray-200 px-4 py-3 shadow-sm"
               >
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-gray-800">{item.itemName}</p>
-                  <p className="text-sm text-gray-500">
+                  {item.customizations && (
+                    <p className="text-xs text-gray-500 mt-1">{item.customizations}</p>
+                  )}
+                  <p className="text-sm text-gray-600 mt-1">
                     ${item.price.toFixed(2)} each
                   </p>
                 </div>
                 <div className="flex items-center gap-2 ml-3">
                   <button
-                    onClick={() => removeFromCart(item.itemId)}
+                    onClick={() => removeFromCart(item.cartId)}
                     className="w-6 h-6 flex items-center justify-center rounded bg-red-100 text-red-600 hover:bg-red-200 font-bold text-sm cursor-pointer transition-colors"
                   >
                     −
                   </button>
                   <span className="w-8 text-center font-semibold text-gray-800">{item.qty}</span>
                   <button
-                    onClick={() => incrementCart(item.itemId)}
+                    onClick={() => incrementCart(item.cartId)}
                     className="w-6 h-6 flex items-center justify-center rounded bg-green-100 text-green-600 hover:bg-green-200 font-bold text-sm cursor-pointer transition-colors"
                   >
                     +
