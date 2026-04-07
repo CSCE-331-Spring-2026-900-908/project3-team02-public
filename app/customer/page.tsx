@@ -42,6 +42,42 @@ export default function KioskPage() {
     fetchItems()
   }, [])
 
+  // Google Translate widget
+  useEffect(() => {
+    // Check if script already exists
+    const existingScript = document.querySelector('script[src*="translate_a/element.js"]')
+    
+    // Define the initialization function
+    ;(window as any).googleTranslateElementInit = function () {
+      if ((window as any).google?.translate?.TranslateElement) {
+        // Clear existing translate elements to prevent duplicates
+        const container = document.getElementById('google_translate_element')
+        if (container) {
+          container.innerHTML = ''
+        }
+        new (window as any).google.translate.TranslateElement(
+          { pageLanguage: 'en' },
+          'google_translate_element'
+        )
+      }
+    }
+
+    // If script doesn't exist, create and append it
+    if (!existingScript) {
+      const script = document.createElement('script')
+      script.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit'
+      script.async = true
+      document.head.appendChild(script)
+    } else if ((window as any).google?.translate?.TranslateElement) {
+      // Script exists and is loaded, initialize immediately
+      ;(window as any).googleTranslateElementInit()
+    }
+
+    return () => {
+      // Don't remove the script - let it persist for navigation
+    }
+  }, [])
+
   const categories = Array.from(new Set(items.map(i => i.category))).filter(c => c && c.trim())
   const visibleItems = selectedCategory ? items.filter(i => i.category === selectedCategory) : []
   const orderTotal = cart.reduce((sum, o) => sum + o.price * o.qty, 0)
@@ -112,6 +148,7 @@ export default function KioskPage() {
               {selectedCategory ? selectedCategory : 'Order Kiosk'}
             </h1>
           </div>
+          <div id="google_translate_element" suppressHydrationWarning></div>
         </header>
 
         {/* Menu grid - Show categories or items */}
