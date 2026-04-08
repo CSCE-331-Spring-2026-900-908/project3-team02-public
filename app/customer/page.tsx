@@ -141,13 +141,32 @@ export default function KioskPage() {
     )
   }
 
-  function submitOrder() {
+  async function submitOrder() {
     if (cart.length === 0) return
-    const summary = cart.map(o => `${o.itemName} x${o.qty}`).join(', ')
-    alert(`Order submitted!\n${summary}\nTotal: $${orderTotal.toFixed(2)}`)
-    setCart([])
-    setSubmitted(true)
-    setTimeout(() => setSubmitted(false), 3000)
+
+    try {
+      const response = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: cart,
+          paymentTypeId: 1, // adjust for your payment method mapping
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Order submission failed on server');
+      }
+
+      const data = await response.json()
+      alert(`Order submitted! Sale ID: ${data.saleId}\nTotal: $${Number(data.total).toFixed(2)}`)
+      setCart([])
+      setSubmitted(true)
+      setTimeout(() => setSubmitted(false), 3000)
+    } catch (error) {
+      console.error('Order Error:', error)
+      alert('Could not submit order. Please check the network connectivity and try again.')
+    }
   }
 
   return (
