@@ -2,54 +2,22 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-
-interface MenuItem {
-  itemid: number
-  itemname: string
-  price: number
-  category: string
-  description: string
-}
-
-interface OrderItem {
-  itemId: number
-  itemName: string
-  price: number
-  qty: number
-  customizations?: string
-  cartId: string
-}
+import { MenuItem, OrderItem } from './types'
+import { MENU_ITEMS } from '../data/menu'
 
 export default function KioskPage() {
-  const [items, setItems] = useState<MenuItem[]>([])
-  const [loading, setLoading] = useState(true)
+  const items = MENU_ITEMS
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [cart, setCart] = useState<OrderItem[]>([])
   const [submitted, setSubmitted] = useState(false)
   const [addedNotification, setAddedNotification] = useState<string | null>(null)
-  
+
   // Customization states
   const [customizingItem, setCustomizingItem] = useState<MenuItem | null>(null)
   const [drinkSize, setDrinkSize] = useState('Medium')
   const [iceLevel, setIceLevel] = useState('Normal Ice')
   const [sugarLevel, setSugarLevel] = useState('100% Sugar')
   const [bobaOption, setBobaOption] = useState<'Regular Boba' | 'Extra Boba' | 'No Boba'>('Regular Boba')
-
-  useEffect(() => {
-    async function fetchItems() {
-      try {
-        const response = await fetch('/api/items')
-        const data = await response.json()
-        // Convert price to number since database returns it as string
-        setItems(data.map((item: any) => ({ ...item, price: Number(item.price) })))
-      } catch (error) {
-        console.error('Error fetching items:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchItems()
-  }, [])
 
   // Google Translate widget
   useEffect(() => {
@@ -315,11 +283,7 @@ export default function KioskPage() {
 
         {/* Menu grid - Show categories or items */}
         <div className="flex-1 overflow-y-auto px-6 py-6">
-          {loading ? (
-            <div className="flex items-center justify-center h-full">
-              <p className="text-gray-500 font-medium">Loading menu...</p>
-            </div>
-          ) : !selectedCategory ? (
+          {!selectedCategory ? (
             // Show categories
             <div className="grid grid-cols-3 gap-6">
               {categories.map(cat => (
