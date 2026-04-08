@@ -26,6 +26,26 @@ export default function KioskPage() {
   const [submitted, setSubmitted] = useState(false)
   const [addedNotification, setAddedNotification] = useState<string | null>(null)
 
+  // Add these with your other state declarations
+  const [weather, setWeather] = useState<any>(null)
+  const [weatherLoading, setWeatherLoading] = useState(true)
+
+  // Weather API
+  useEffect(() => {
+    async function fetchWeather() {
+      try {
+        const response = await fetch('/api/weather')
+        const data = await response.json()
+        setWeather(data)
+      } catch (error) {
+        console.error('Error fetching weather:', error)
+      } finally {
+        setWeatherLoading(false)
+      }
+    }
+    fetchWeather()
+  }, [])
+
   useEffect(() => {
     async function fetchItems() {
       try {
@@ -44,37 +64,35 @@ export default function KioskPage() {
 
   // Google Translate widget
   useEffect(() => {
-    // Check if script already exists
-    const existingScript = document.querySelector('script[src*="translate_a/element.js"]')
-    
     // Define the initialization function
     ;(window as any).googleTranslateElementInit = function () {
       if ((window as any).google?.translate?.TranslateElement) {
-        // Clear existing translate elements to prevent duplicates
-        const container = document.getElementById('google_translate_element')
-        if (container) {
-          container.innerHTML = ''
-        }
         new (window as any).google.translate.TranslateElement(
-          { pageLanguage: 'en' },
+          { pageLanguage: 'en', layout: (window as any).google.translate.TranslateElement.InlineLayout.SIMPLE }, 
           'google_translate_element'
         )
       }
     }
 
-    // If script doesn't exist, create and append it
+    // Check if script already exists
+    const existingScript = document.querySelector('script[src*="translate_a/element.js"]')
+    
     if (!existingScript) {
       const script = document.createElement('script')
       script.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit'
       script.async = true
+      script.defer = true
       document.head.appendChild(script)
-    } else if ((window as any).google?.translate?.TranslateElement) {
-      // Script exists and is loaded, initialize immediately
-      ;(window as any).googleTranslateElementInit()
+    } else {
+      // Script already loaded, try to initialize
+      setTimeout(() => {
+        if ((window as any).google?.translate?.TranslateElement) {
+          ;(window as any).googleTranslateElementInit()
+        }
+      }, 100)
     }
 
     return () => {
-      // Don't remove the script - let it persist for navigation
     }
   }, [])
 
@@ -134,21 +152,29 @@ export default function KioskPage() {
       {/* Left panel - Menu */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <header className="px-6 py-4 border-b border-gray-200 flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-1 min-w-0">
             {selectedCategory && (
               <button
                 onClick={() => setSelectedCategory(null)}
-                className="text-2xl font-bold text-gray-600 hover:text-gray-900 transition-colors"
+                className="text-2xl font-bold text-gray-600 hover:text-gray-900 transition-colors flex-shrink-0"
               >
                 ←
               </button>
             )}
-            <h1 className="text-2xl font-bold text-gray-900">
+            <h1 className="text-2xl font-bold text-gray-900 truncate">
               {selectedCategory ? selectedCategory : 'Order Kiosk'}
             </h1>
           </div>
-          <div id="google_translate_element" suppressHydrationWarning></div>
+          {!weatherLoading && weather && (
+            <div className="px-3 py-2 bg-blue-50 rounded-lg border border-blue-200 text-sm flex-shrink-0">
+              <p className="font-semibold text-blue-900">{weather.current.temperature?.toFixed(1)}°F</p>
+              {weather.daily && (
+                <p className="text-xs text-blue-800">H: {weather.daily.temperature_2m_max?.[0]?.toFixed(1)}° / L: {weather.daily.temperature_2m_min?.[0]?.toFixed(1)}°</p>
+              )}
+            </div>
+          )}
+          <div id="google_translate_element" suppressHydrationWarning className="flex-shrink-0"></div>
         </header>
 
         {/* Menu grid - Show categories or items */}

@@ -24,3 +24,14 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Reduce Google Translate widget height */
+#google_translate_element {
+  line-height: 1;
+  font-size: 12px;
+}
+
+#google_translate_element > div {
+  display: inline-block;
+  height: auto;
+}
