@@ -7,7 +7,7 @@ import { MENU_ITEMS } from '../data/menu'
 import ChatWidget from './ChatWidget'
 
 export default function KioskPage() {
-  const items = MENU_ITEMS
+  const [items, setItems] = useState<MenuItem[]>(MENU_ITEMS)
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [cart, setCart] = useState<OrderItem[]>([])
   const [submitted, setSubmitted] = useState(false)
@@ -23,6 +23,31 @@ export default function KioskPage() {
   // Add these with your other state declarations
   const [weather, setWeather] = useState<any>(null)
   const [weatherLoading, setWeatherLoading] = useState(true)
+
+  // Items from DB (falls back to hardcoded MENU_ITEMS on failure)
+  useEffect(() => {
+    async function fetchItems() {
+      try {
+        const response = await fetch('/api/items')
+        if (!response.ok) return
+        const rows = await response.json()
+        if (!Array.isArray(rows) || rows.length === 0) return
+        const normalized: MenuItem[] = rows
+          .filter((r: any) => r.isactive !== false)
+          .map((r: any) => ({
+            itemid: r.itemid,
+            itemname: r.itemname,
+            price: Number(r.price),
+            category: r.category,
+            description: r.description ?? '',
+          }))
+        setItems(normalized)
+      } catch (error) {
+        console.error('Error fetching items, using hardcoded fallback:', error)
+      }
+    }
+    fetchItems()
+  }, [])
 
   // Weather API
   useEffect(() => {

@@ -1,29 +1,50 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { MENU_ITEMS } from '../../data/menu'
+import { pool } from '../../../lib/db'
+import { MenuItem } from '../../customer/types'
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 })
 
-function buildMenuSection(): string {
-  const byCategory = new Map<string, typeof MENU_ITEMS>()
-  for (const item of MENU_ITEMS) {
+async function loadMenu(): Promise<MenuItem[]> {
+  try {
+    const result = await pool.query(
+      `SELECT itemid, itemname, price, category, description FROM items WHERE isactive = true ORDER BY category, itemname`
+    )
+    if (result.rows.length === 0) return MENU_ITEMS
+    return result.rows.map((r: any) => ({
+      itemid: r.itemid,
+      itemname: r.itemname,
+      price: Number(r.price),
+      category: r.category,
+      description: r.description ?? '',
+    }))
+  } catch (error) {
+    console.error('Chat API: items query failed, using hardcoded fallback:', error)
+    return MENU_ITEMS
+  }
+}
+
+function buildMenuSection(items: MenuItem[]): string {
+  const byCategory = new Map<string, MenuItem[]>()
+  for (const item of items) {
     const list = byCategory.get(item.category) || []
     list.push(item)
     byCategory.set(item.category, list)
   }
 
   let menu = ''
-  for (const [category, items] of byCategory) {
+  for (const [category, catItems] of byCategory) {
     menu += `\n### ${category}\n`
-    for (const item of items) {
+    for (const item of catItems) {
       menu += `- ${item.itemname} (ID: ${item.itemid}) - $${item.price.toFixed(2)}\n`
     }
   }
   return menu
 }
 
-const SYSTEM_PROMPT = `You are a decision-helper for a bubble tea shop. Customers can already browse categories on the menu UI by themselves — your job is NOT to read the menu to them. Your job is to help them figure out what THEY want and then commit to a specific drink.
+const SYSTEM_PROMPT_BASE = `You are a decision-helper for a bubble tea shop. Customers can already browse categories on the menu UI by themselves — your job is NOT to read the menu to them. Your job is to help them figure out what THEY want and then commit to a specific drink.
 
 ## YOUR ROLE
 - Ask about mood, flavor preference, texture, or craving — not categories.
@@ -36,9 +57,6 @@ const SYSTEM_PROMPT = `You are a decision-helper for a bubble tea shop. Customer
 - Use decision language: "Want something refreshing or something rich?", "In the mood for fruity or creamy?", "Feeling adventurous?"
 - Avoid menu language: do NOT say "We have Milk Tea, Fruit Tea, Slush, and Special" or "Browse our categories."
 - Keep replies to 1-2 sentences max.
-
-## MENU (internal reference — do not recite)
-${buildMenuSection()}
 
 ## RESPONSE FORMAT
 You MUST respond with valid JSON in this exact format and nothing else:
@@ -117,7 +135,9 @@ export async function POST(request: Request) {
     const cartLine = body.cartSummary && body.cartSummary !== 'Empty'
       ? body.cartSummary
       : 'Empty - nothing ordered yet'
-    const systemPrompt = `${SYSTEM_PROMPT}\n\n## CURRENT WEATHER\n${describeWeather(body.weather)}\n\n## CUSTOMER'S CURRENT CART\n${cartLine}`
+    const menu = await loadMenu()
+    const menuSection = buildMenuSection(menu)
+    const systemPrompt = `${SYSTEM_PROMPT_BASE}\n\n## MENU (internal reference — do not recite)\n${menuSection}\n\n## CURRENT WEATHER\n${describeWeather(body.weather)}\n\n## CUSTOMER'S CURRENT CART\n${cartLine}`
 
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
