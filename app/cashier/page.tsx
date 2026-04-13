@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 
 interface MenuItem {
@@ -17,35 +17,56 @@ interface OrderItem {
   qty: number
 }
 
-const CATEGORIES = ['All', 'Milk Tea', 'Fruit Tea', 'Slush', 'Special']
-
-const MENU_ITEMS: MenuItem[] = [
-  { id: 1,  name: 'Classic Milk Tea',     price: 5.50, category: 'Milk Tea'  },
-  { id: 2,  name: 'Taro Milk Tea',        price: 6.25, category: 'Milk Tea'  },
-  { id: 3,  name: 'Brown Sugar Milk Tea', price: 6.75, category: 'Milk Tea'  },
-  { id: 4,  name: 'Matcha Milk Tea',      price: 6.50, category: 'Milk Tea'  },
-  { id: 5,  name: 'Passion Fruit Tea',    price: 5.75, category: 'Fruit Tea' },
-  { id: 6,  name: 'Lychee Tea',           price: 5.75, category: 'Fruit Tea' },
-  { id: 7,  name: 'Strawberry Tea',       price: 5.75, category: 'Fruit Tea' },
-  { id: 8,  name: 'Peach Tea',            price: 5.50, category: 'Fruit Tea' },
-  { id: 9,  name: 'Mango Slush',          price: 6.00, category: 'Slush'     },
-  { id: 10, name: 'Strawberry Slush',     price: 6.00, category: 'Slush'     },
-  { id: 11, name: 'Taro Slush',           price: 6.25, category: 'Slush'     },
-  { id: 12, name: 'Tiger Sugar Latte',    price: 7.00, category: 'Special'   },
-  { id: 13, name: 'Oreo Smoothie',        price: 7.25, category: 'Special'   },
-  { id: 14, name: 'Cheese Foam Tea',      price: 7.50, category: 'Special'   },
-]
-
 export default function CashierPage() {
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([])
+  const [categories, setCategories] = useState<string[]>(['All'])
   const [activeCategory, setActiveCategory] = useState<string>('All')
   const [cart, setCart] = useState<OrderItem[]>([])
   const [paymentType, setPaymentType] = useState<'Card' | 'Cash'>('Card')
   const [submitted, setSubmitted] = useState(false)
 
+  useEffect(() => {
+    async function fetchMenuItems() {
+      try {
+        const res = await fetch('/api/items')
+        if (!res.ok) throw new Error('Failed to fetch menu items')
+
+        const raw: unknown = await res.json()
+        if (!Array.isArray(raw)) throw new Error('Invalid items payload')
+
+        const formattedData: MenuItem[] = raw
+          .map((item: any) => ({
+            id: Number(item?.itemid),       // Changed from item?.id
+            name: String(item?.itemname ?? ''), // Changed from item?.name
+            price: Number(item?.price),
+            category: String(item?.category ?? 'Uncategorized'),
+          }))
+          .filter(
+            item =>
+              Number.isFinite(item.id) &&
+              item.name.length > 0 &&
+              Number.isFinite(item.price) &&
+              item.category.length > 0
+          )
+
+        setMenuItems(formattedData)
+
+        const uniqueCategories = Array.from(new Set(formattedData.map(item => item.category)))
+        setCategories(['All', ...uniqueCategories])
+      } catch (error) {
+        console.error('Cashier fetch error:', error)
+        setMenuItems([])
+        setCategories(['All'])
+      }
+    }
+
+    fetchMenuItems()
+  }, [])
+
   const visibleItems =
     activeCategory === 'All'
-      ? MENU_ITEMS
-      : MENU_ITEMS.filter(item => item.category === activeCategory)
+      ? menuItems
+      : menuItems.filter(item => item.category === activeCategory)
 
   const orderTotal = cart.reduce((sum, o) => sum + o.price * o.qty, 0)
 
@@ -94,7 +115,7 @@ export default function CashierPage() {
 
         {/* Category filter bar */}
         <div className="px-6 py-3 flex gap-2 border-b border-gray-100 overflow-x-auto">
-          {CATEGORIES.map(cat => (
+          {categories.map(cat => (
             <button
               key={cat}
               onClick={() => setActiveCategory(cat)}
