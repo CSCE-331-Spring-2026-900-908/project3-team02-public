@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { MenuItem, OrderItem } from './types'
 import { MENU_ITEMS } from '../data/menu'
+import ChatWidget from './ChatWidget'
 
 export default function KioskPage() {
   const items = MENU_ITEMS
@@ -113,6 +114,30 @@ export default function KioskPage() {
     setCustomizingItem(null)
   }
 
+  function addToCartFromChat(item: MenuItem) {
+    const customString = 'Medium, Normal Ice, 100% Sugar, Regular Boba'
+    const cartId = `${item.itemid}-${customString}`
+    setCart(prev => {
+      const existing = prev.find(o => o.cartId === cartId)
+      if (existing) {
+        return prev.map(o => (o.cartId === cartId ? { ...o, qty: o.qty + 1 } : o))
+      }
+      return [
+        ...prev,
+        {
+          itemId: item.itemid,
+          itemName: item.itemname,
+          price: item.price,
+          qty: 1,
+          customizations: customString,
+          cartId,
+        },
+      ]
+    })
+    setAddedNotification(item.itemname)
+    setTimeout(() => setAddedNotification(null), 2000)
+  }
+
   function incrementCart(cartId: string) {
     setCart(prev =>
       prev.map(o => (o.cartId === cartId ? { ...o, qty: o.qty + 1 } : o))
@@ -157,6 +182,13 @@ export default function KioskPage() {
 
   return (
     <div className="flex h-screen bg-white font-sans">
+      <ChatWidget
+        menuItems={items}
+        cart={cart}
+        weather={weather}
+        onAddToCart={addToCartFromChat}
+        onSelectCategory={setSelectedCategory}
+      />
       {/* Customization Modal */}
       {customizingItem && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm">

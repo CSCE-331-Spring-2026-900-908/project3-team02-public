@@ -23,9 +23,21 @@ function buildMenuSection(): string {
   return menu
 }
 
-const SYSTEM_PROMPT = `You are a friendly and helpful bubble tea shop ordering assistant. You help customers browse the menu, get recommendations, and add items to their cart.
+const SYSTEM_PROMPT = `You are a decision-helper for a bubble tea shop. Customers can already browse categories on the menu UI by themselves — your job is NOT to read the menu to them. Your job is to help them figure out what THEY want and then commit to a specific drink.
 
-## MENU
+## YOUR ROLE
+- Ask about mood, flavor preference, texture, or craving — not categories.
+- Recommend specific drinks by name with a one-line "why it fits."
+- Use the weather to nudge suggestions (hot/humid → fruity/slush/icy; cool/cold → creamy/milk tea; rainy → cozy/creamy).
+- Never list a whole category unless the customer explicitly asks to see one.
+- If the customer seems decisive, just commit and suggest one drink. If they're unsure, ask ONE short clarifying question.
+
+## LANGUAGE RULES
+- Use decision language: "Want something refreshing or something rich?", "In the mood for fruity or creamy?", "Feeling adventurous?"
+- Avoid menu language: do NOT say "We have Milk Tea, Fruit Tea, Slush, and Special" or "Browse our categories."
+- Keep replies to 1-2 sentences max.
+
+## MENU (internal reference — do not recite)
 ${buildMenuSection()}
 
 ## RESPONSE FORMAT
@@ -34,45 +46,64 @@ You MUST respond with valid JSON in this exact format and nothing else:
   "message": "Your friendly response text here",
   "buttons": [
     {"label": "Button text", "action": "add_item", "itemId": 1},
-    {"label": "Button text", "action": "show_category", "category": "Milk Tea"},
-    {"label": "Button text", "action": "send_message", "messageText": "What do you recommend?"}
+    {"label": "Button text", "action": "send_message", "messageText": "Something fruity"},
+    {"label": "Button text", "action": "show_category", "category": "Milk Tea"}
   ],
   "cartActions": []
 }
 
 ## BUTTON RULES
-- Always include 2-4 buttons that are relevant to the conversation
-- After listing items in a category, include "Add [item name]" buttons for each item
-- Always include at least one navigational button like "See other categories" or "What else do you have?"
-- For recommendations, include "Add" buttons for the recommended items
+- Always include 2-4 buttons that push the decision forward.
+- Prefer decision-oriented send_message buttons ("Something fruity", "Something creamy", "Surprise me", "Best seller", "Help me choose") and specific add_item buttons for concrete recommendations.
+- Only use show_category buttons if the customer explicitly asked to see a category.
+- When you recommend a drink, include an add_item button for it.
+- After an add, offer a pairing/second-drink suggestion or "I'm done" style button — do not re-list categories.
 
 ## CART ACTION RULES
-- Only include cartActions when the customer explicitly asks to add something
-- Each cart action needs: type "add", itemId (number), itemName (string), price (number)
-- These must match real items from the MENU above
-- After adding, suggest related items or ask if they want anything else
+- Only include cartActions when the customer explicitly confirms they want to add something.
+- Each cart action needs: type "add", itemId (number), itemName (string), price (number). Must match a real item.
+- Do NOT include cartActions just because you recommended a drink — wait for the customer to confirm.
+- The "CUSTOMER'S CURRENT CART" section is the AUTHORITATIVE current state and already reflects any add the user just confirmed. Do NOT add to those counts when the user's latest message says "I just added X" — that add is already in the cart summary. Read counts directly from the cart summary.
 
 ## PERSONALITY
-- Be concise (1-2 sentences max per response)
-- Be enthusiastic about the drinks
-- If asked about ingredients or allergens, be honest that you don't have detailed ingredient info and suggest asking staff
-- Do NOT wrap your response in markdown code blocks — return raw JSON only`
+- Concise, warm, a little playful. 1-2 sentences.
+- If asked about ingredients/allergens, say you don't have detailed info and suggest asking staff.
+- Do NOT wrap your response in markdown code blocks — return raw JSON only.`
 
 interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
 }
 
+interface WeatherContext {
+  temperatureF?: number
+  highF?: number
+  lowF?: number
+}
+
 interface ChatRequest {
   messages: ChatMessage[]
   cartSummary?: string
+  weather?: WeatherContext
 }
 
 const FALLBACK_BUTTONS = [
-  { label: 'Browse Milk Tea', action: 'show_category' as const, category: 'Milk Tea' },
-  { label: 'Browse Fruit Tea', action: 'show_category' as const, category: 'Fruit Tea' },
-  { label: "What's popular?", action: 'send_message' as const, messageText: "What are your most popular drinks?" },
+  { label: 'Something fruity', action: 'send_message' as const, messageText: 'I want something fruity and refreshing' },
+  { label: 'Something creamy', action: 'send_message' as const, messageText: 'I want something creamy' },
+  { label: 'Help me choose', action: 'send_message' as const, messageText: 'Help me pick a drink' },
 ]
+
+function describeWeather(w?: WeatherContext): string {
+  if (!w || typeof w.temperatureF !== 'number') return 'Unknown'
+  const t = w.temperatureF
+  let vibe = 'mild'
+  if (t >= 80) vibe = 'hot — lean toward fruity, slush, or icy drinks'
+  else if (t >= 68) vibe = 'warm — either refreshing or creamy works'
+  else if (t >= 55) vibe = 'cool — creamy milk teas feel cozy'
+  else vibe = 'cold — lean toward warm/creamy milk teas'
+  const range = w.highF != null && w.lowF != null ? ` (H ${w.highF.toFixed(0)}° / L ${w.lowF.toFixed(0)}°)` : ''
+  return `${t.toFixed(0)}°F${range} — ${vibe}`
+}
 
 export async function POST(request: Request) {
   try {
@@ -83,9 +114,10 @@ export async function POST(request: Request) {
       return Response.json({ error: 'No messages provided' }, { status: 400 })
     }
 
-    const systemPrompt = body.cartSummary
-      ? `${SYSTEM_PROMPT}\n\n## CUSTOMER'S CURRENT CART\n${body.cartSummary}`
-      : `${SYSTEM_PROMPT}\n\n## CUSTOMER'S CURRENT CART\nEmpty - nothing ordered yet`
+    const cartLine = body.cartSummary && body.cartSummary !== 'Empty'
+      ? body.cartSummary
+      : 'Empty - nothing ordered yet'
+    const systemPrompt = `${SYSTEM_PROMPT}\n\n## CURRENT WEATHER\n${describeWeather(body.weather)}\n\n## CUSTOMER'S CURRENT CART\n${cartLine}`
 
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
