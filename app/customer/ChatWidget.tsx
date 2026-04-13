@@ -404,18 +404,14 @@ export default function ChatWidget({ menuItems, cart, weather, onAddToCart, onMo
         </div>
       )}
 
-      <div className="px-3 py-2 border-t border-gray-200 bg-white flex gap-2 items-center">
-        <input
-          type="text"
-          value={inputText}
-          onChange={e => setInputText(e.target.value)}
-          onKeyDown={e => {
-            if (e.key === 'Enter') handleSendText(inputText)
-          }}
-          placeholder={isListening ? 'Listening...' : 'Type a message...'}
-          className="flex-1 px-3 py-2 text-sm rounded-full border border-gray-300 bg-gray-50 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        {speechSupported && (
+      {speechSupported && (
+        <div className="px-3 py-2 border-t border-gray-200 bg-white flex gap-2 items-center">
+          <div
+            className="flex-1 px-3 py-2 text-sm rounded-full border border-gray-300 bg-gray-50 text-gray-500 truncate select-none"
+            aria-live="polite"
+          >
+            {isListening ? (inputText || 'Listening...') : 'Tap the mic to speak'}
+          </div>
           <button
             onClick={isListening ? stopListening : startListening}
             disabled={isLoading}
@@ -429,15 +425,8 @@ export default function ChatWidget({ menuItems, cart, weather, onAddToCart, onMo
           >
             🎤
           </button>
-        )}
-        <button
-          onClick={() => handleSendText(inputText)}
-          disabled={isLoading || !inputText.trim()}
-          className="px-4 py-2 rounded-full bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
-        >
-          Send
-        </button>
-      </div>
+        </div>
+      )}
     </div>
   )
 }
