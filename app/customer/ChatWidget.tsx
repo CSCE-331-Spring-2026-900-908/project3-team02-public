@@ -61,6 +61,71 @@ function formatCustomization(c: Pick<LastAdded, 'size' | 'ice' | 'sugar' | 'boba
 
 export default function ChatWidget({ menuItems, cart, weather, onAddToCart, onModifyCartLine, onSelectCategory, onRequestClose }: ChatWidgetProps) {
   const [lastAdded, setLastAdded] = useState<LastAdded | null>(null)
+  const [isListening, setIsListening] = useState(false)
+  const [speechSupported, setSpeechSupported] = useState(false)
+  const recognitionRef = useRef<any>(null)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SpeechRecognition) return
+    setSpeechSupported(true)
+    const recognition = new SpeechRecognition()
+    recognition.continuous = false
+    recognition.interimResults = true
+    recognition.lang = 'en-US'
+    recognitionRef.current = recognition
+  }, [])
+
+  function startListening() {
+    const recognition = recognitionRef.current
+    if (!recognition || isListening) return
+    setInputText('')
+    setIsListening(true)
+
+    let finalTranscript = ''
+    recognition.onresult = (event: any) => {
+      let interim = ''
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript
+        } else {
+          interim += transcript
+        }
+      }
+      setInputText(finalTranscript + interim)
+    }
+    recognition.onerror = (event: any) => {
+      // 'no-speech' and 'aborted' are benign — user tapped mic without speaking
+      // or manually stopped. Only warn on real failures.
+      if (event.error !== 'no-speech' && event.error !== 'aborted') {
+        console.warn('Speech recognition error:', event.error)
+      }
+      setIsListening(false)
+    }
+    recognition.onend = () => {
+      setIsListening(false)
+      const toSend = finalTranscript.trim()
+      if (toSend) {
+        handleSendText(toSend)
+      }
+    }
+    try {
+      recognition.start()
+    } catch (error) {
+      console.error('Failed to start speech recognition:', error)
+      setIsListening(false)
+    }
+  }
+
+  function stopListening() {
+    const recognition = recognitionRef.current
+    if (recognition && isListening) {
+      recognition.stop()
+    }
+  }
   const weatherContext: WeatherContext | undefined = weather?.current?.temperature != null
     ? {
         temperatureF: weather.current.temperature,
@@ -339,7 +404,7 @@ export default function ChatWidget({ menuItems, cart, weather, onAddToCart, onMo
         </div>
       )}
 
-      <div className="px-3 py-2 border-t border-gray-200 bg-white flex gap-2">
+      <div className="px-3 py-2 border-t border-gray-200 bg-white flex gap-2 items-center">
         <input
           type="text"
           value={inputText}
@@ -347,9 +412,24 @@ export default function ChatWidget({ menuItems, cart, weather, onAddToCart, onMo
           onKeyDown={e => {
             if (e.key === 'Enter') handleSendText(inputText)
           }}
-          placeholder="Type a message..."
+          placeholder={isListening ? 'Listening...' : 'Type a message...'}
           className="flex-1 px-3 py-2 text-sm rounded-full border border-gray-300 bg-gray-50 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
+        {speechSupported && (
+          <button
+            onClick={isListening ? stopListening : startListening}
+            disabled={isLoading}
+            className={`w-10 h-10 rounded-full flex items-center justify-center text-lg transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+              isListening
+                ? 'bg-red-500 text-white animate-pulse hover:bg-red-600'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+            aria-label={isListening ? 'Stop listening' : 'Start voice input'}
+            title={isListening ? 'Stop listening' : 'Tap to speak'}
+          >
+            🎤
+          </button>
+        )}
         <button
           onClick={() => handleSendText(inputText)}
           disabled={isLoading || !inputText.trim()}
