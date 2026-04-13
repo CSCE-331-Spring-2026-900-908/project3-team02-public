@@ -3,10 +3,19 @@
 import { useEffect, useRef, useState } from 'react'
 import { MenuItem, OrderItem } from './types'
 
+type CustomizationUpdate = {
+  size?: 'Medium' | 'Large'
+  ice?: 'Normal Ice' | 'Less Ice' | 'No Ice'
+  sugar?: '100% Sugar' | '75% Sugar' | '50% Sugar' | '25% Sugar' | '0% Sugar'
+  boba?: 'Regular Boba' | 'Extra Boba' | 'No Boba'
+}
+
 type ChatButton =
   | { label: string; action: 'add_item'; itemId: number }
   | { label: string; action: 'show_category'; category: string }
   | { label: string; action: 'send_message'; messageText: string }
+  | { label: string; action: 'modify_item'; update: CustomizationUpdate }
+  | { label: string; action: 'checkout' }
 
 type CartAction = {
   type: 'add'
@@ -31,11 +40,27 @@ interface ChatWidgetProps {
   menuItems: MenuItem[]
   cart: OrderItem[]
   weather?: any
-  onAddToCart: (item: MenuItem) => void
+  onAddToCart: (item: MenuItem) => string
+  onModifyCartLine: (oldCartId: string, newCustomString: string) => string | null
   onSelectCategory: (category: string) => void
+  onRequestClose?: () => void
 }
 
-export default function ChatWidget({ menuItems, cart, weather, onAddToCart, onSelectCategory }: ChatWidgetProps) {
+type LastAdded = {
+  cartId: string
+  itemName: string
+  size: 'Medium' | 'Large'
+  ice: 'Normal Ice' | 'Less Ice' | 'No Ice'
+  sugar: '100% Sugar' | '75% Sugar' | '50% Sugar' | '25% Sugar' | '0% Sugar'
+  boba: 'Regular Boba' | 'Extra Boba' | 'No Boba'
+}
+
+function formatCustomization(c: Pick<LastAdded, 'size' | 'ice' | 'sugar' | 'boba'>): string {
+  return `${c.size}, ${c.ice}, ${c.sugar}, ${c.boba}`
+}
+
+export default function ChatWidget({ menuItems, cart, weather, onAddToCart, onModifyCartLine, onSelectCategory, onRequestClose }: ChatWidgetProps) {
+  const [lastAdded, setLastAdded] = useState<LastAdded | null>(null)
   const weatherContext: WeatherContext | undefined = weather?.current?.temperature != null
     ? {
         temperatureF: weather.current.temperature,
@@ -71,20 +96,28 @@ export default function ChatWidget({ menuItems, cart, weather, onAddToCart, onSe
     }
   }, [messages, isLoading])
 
+  const GREETING_MESSAGE: ChatMessage = {
+    role: 'assistant',
+    content: "Hi! I can help you find a drink fast. What sounds good?",
+    buttons: [
+      { label: 'Best sellers', action: 'send_message', messageText: 'Show me your best sellers' },
+      { label: 'Help me choose', action: 'send_message', messageText: 'Help me choose a drink' },
+      { label: 'Something fruity', action: 'send_message', messageText: 'I want something fruity' },
+      { label: 'Something creamy', action: 'send_message', messageText: 'I want something creamy' },
+    ],
+  }
+
+  function resetConversation() {
+    setMessages([GREETING_MESSAGE])
+    setInputText('')
+  }
+
   useEffect(() => {
     if (isOpen && !hasGreeted) {
       setHasGreeted(true)
-      sendToApi(
-        [
-          {
-            role: 'user',
-            content:
-              "Hi! I just walked up to the kiosk and I'm not sure what I want yet. Greet me briefly and offer decision-oriented starter buttons like \"Best seller\", \"Help me choose\", \"Something fruity\", \"Something creamy\", or a weather-based pick — do NOT list categories.",
-          },
-        ],
-        { isGreeting: true }
-      )
+      setMessages([GREETING_MESSAGE])
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, hasGreeted])
 
   async function sendToApi(
@@ -110,7 +143,17 @@ export default function ChatWidget({ menuItems, cart, weather, onAddToCart, onSe
         for (const action of data.cartActions as CartAction[]) {
           if (action.type === 'add') {
             const match = menuItems.find(i => i.itemid === action.itemId)
-            if (match) onAddToCart(match)
+            if (match) {
+              const newCartId = onAddToCart(match)
+              setLastAdded({
+                cartId: newCartId,
+                itemName: match.itemname,
+                size: 'Medium',
+                ice: 'Normal Ice',
+                sugar: '100% Sugar',
+                boba: 'Regular Boba',
+              })
+            }
           }
         }
       }
@@ -150,26 +193,58 @@ export default function ChatWidget({ menuItems, cart, weather, onAddToCart, onSe
     if (isLoading) return
     if (button.action === 'add_item') {
       const match = menuItems.find(i => i.itemid === button.itemId)
-      if (match) onAddToCart(match)
+      if (!match) return
+      const newCartId = onAddToCart(match)
+      setLastAdded({
+        cartId: newCartId,
+        itemName: match.itemname,
+        size: 'Medium',
+        ice: 'Normal Ice',
+        sugar: '100% Sugar',
+        boba: 'Regular Boba',
+      })
       const next: ChatMessage[] = [
         ...messages,
-        { role: 'user', content: `I just added ${match?.itemname ?? 'that item'} to my cart.` },
+        { role: 'user', content: `I just added ${match.itemname} to my cart.` },
       ]
       setMessages(next)
-      const projected: OrderItem[] = match
-        ? [
-            ...cartRef.current,
-            {
-              itemId: match.itemid,
-              itemName: match.itemname,
-              price: match.price,
-              qty: 1,
-              customizations: 'Medium, Normal Ice, 100% Sugar, Regular Boba',
-              cartId: `chat-${match.itemid}`,
-            },
-          ]
-        : cartRef.current
+      const projected: OrderItem[] = [
+        ...cartRef.current,
+        {
+          itemId: match.itemid,
+          itemName: match.itemname,
+          price: match.price,
+          qty: 1,
+          customizations: 'Medium, Normal Ice, 100% Sugar, Regular Boba',
+          cartId: `chat-${match.itemid}`,
+        },
+      ]
       sendToApi(next, { skipCartActions: true, cartOverride: projected })
+    } else if (button.action === 'modify_item') {
+      if (!lastAdded) return
+      const updated = {
+        size: button.update.size ?? lastAdded.size,
+        ice: button.update.ice ?? lastAdded.ice,
+        sugar: button.update.sugar ?? lastAdded.sugar,
+        boba: button.update.boba ?? lastAdded.boba,
+      }
+      const newCustomString = formatCustomization(updated)
+      const newCartId = onModifyCartLine(lastAdded.cartId, newCustomString)
+      if (!newCartId) return
+      setLastAdded({
+        cartId: newCartId,
+        itemName: lastAdded.itemName,
+        ...updated,
+      })
+      const next: ChatMessage[] = [
+        ...messages,
+        { role: 'user', content: `${button.label} on my ${lastAdded.itemName}.` },
+      ]
+      setMessages(next)
+      sendToApi(next, { skipCartActions: true })
+    } else if (button.action === 'checkout') {
+      setIsOpen(false)
+      if (onRequestClose) onRequestClose()
     } else if (button.action === 'show_category') {
       onSelectCategory(button.category)
       const next: ChatMessage[] = [
@@ -199,18 +274,29 @@ export default function ChatWidget({ menuItems, cart, weather, onAddToCart, onSe
 
   return (
     <div className="fixed bottom-6 right-[416px] z-40 w-96 h-[540px] bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden">
-      <header className="px-4 py-3 bg-blue-600 text-white flex items-center justify-between">
-        <div>
+      <header className="px-4 py-3 bg-blue-600 text-white flex items-center justify-between gap-2">
+        <div className="min-w-0">
           <p className="font-bold">Personal Assistant</p>
           <p className="text-xs text-blue-100">Ask me about drinks!</p>
         </div>
-        <button
-          onClick={() => setIsOpen(false)}
-          className="w-8 h-8 rounded-full hover:bg-blue-700 transition-colors cursor-pointer flex items-center justify-center"
-          aria-label="Close chat"
-        >
-          ✕
-        </button>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <button
+            onClick={resetConversation}
+            disabled={messages.length <= 1}
+            className="px-2 h-8 rounded-full hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer flex items-center justify-center text-xs font-semibold"
+            aria-label="Start over"
+            title="Start over"
+          >
+            ↶ Start over
+          </button>
+          <button
+            onClick={() => setIsOpen(false)}
+            className="w-8 h-8 rounded-full hover:bg-blue-700 transition-colors cursor-pointer flex items-center justify-center"
+            aria-label="Close chat"
+          >
+            ✕
+          </button>
+        </div>
       </header>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3 bg-gray-50">

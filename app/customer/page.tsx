@@ -139,8 +139,10 @@ export default function KioskPage() {
     setCustomizingItem(null)
   }
 
-  function addToCartFromChat(item: MenuItem) {
-    const customString = 'Medium, Normal Ice, 100% Sugar, Regular Boba'
+  const DEFAULT_CUSTOM_STRING = 'Medium, Normal Ice, 100% Sugar, Regular Boba'
+
+  function addToCartFromChat(item: MenuItem): string {
+    const customString = DEFAULT_CUSTOM_STRING
     const cartId = `${item.itemid}-${customString}`
     setCart(prev => {
       const existing = prev.find(o => o.cartId === cartId)
@@ -161,6 +163,29 @@ export default function KioskPage() {
     })
     setAddedNotification(item.itemname)
     setTimeout(() => setAddedNotification(null), 2000)
+    return cartId
+  }
+
+  function modifyChatCartLine(oldCartId: string, newCustomString: string): string | null {
+    let newCartId: string | null = null
+    setCart(prev => {
+      const line = prev.find(o => o.cartId === oldCartId)
+      if (!line) return prev
+      newCartId = `${line.itemId}-${newCustomString}`
+      if (newCartId === oldCartId) return prev
+      const withoutOld = prev.filter(o => o.cartId !== oldCartId)
+      const existing = withoutOld.find(o => o.cartId === newCartId)
+      if (existing) {
+        return withoutOld.map(o =>
+          o.cartId === newCartId ? { ...o, qty: o.qty + line.qty } : o
+        )
+      }
+      return [
+        ...withoutOld,
+        { ...line, customizations: newCustomString, cartId: newCartId },
+      ]
+    })
+    return newCartId
   }
 
   function incrementCart(cartId: string) {
@@ -212,6 +237,7 @@ export default function KioskPage() {
         cart={cart}
         weather={weather}
         onAddToCart={addToCartFromChat}
+        onModifyCartLine={modifyChatCartLine}
         onSelectCategory={setSelectedCategory}
       />
       {/* Customization Modal */}
