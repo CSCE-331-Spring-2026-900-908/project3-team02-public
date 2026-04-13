@@ -2,32 +2,17 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-
-interface MenuItem {
-  itemid: number
-  itemname: string
-  price: number
-  category: string
-  description: string
-}
-
-interface OrderItem {
-  itemId: number
-  itemName: string
-  price: number
-  qty: number
-  customizations?: string
-  cartId: string
-}
+import { MenuItem, OrderItem } from './types'
+import { MENU_ITEMS } from '../data/menu'
+import ChatWidget from './ChatWidget'
 
 export default function KioskPage() {
-  const [items, setItems] = useState<MenuItem[]>([])
-  const [loading, setLoading] = useState(true)
+  const [items, setItems] = useState<MenuItem[]>(MENU_ITEMS)
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [cart, setCart] = useState<OrderItem[]>([])
   const [submitted, setSubmitted] = useState(false)
   const [addedNotification, setAddedNotification] = useState<string | null>(null)
-  
+
   // Customization states
   const [customizingItem, setCustomizingItem] = useState<MenuItem | null>(null)
   const [drinkSize, setDrinkSize] = useState('Medium')
@@ -38,6 +23,31 @@ export default function KioskPage() {
   // Add these with your other state declarations
   const [weather, setWeather] = useState<any>(null)
   const [weatherLoading, setWeatherLoading] = useState(true)
+
+  // Items from DB (falls back to hardcoded MENU_ITEMS on failure)
+  useEffect(() => {
+    async function fetchItems() {
+      try {
+        const response = await fetch('/api/items')
+        if (!response.ok) return
+        const rows = await response.json()
+        if (!Array.isArray(rows) || rows.length === 0) return
+        const normalized: MenuItem[] = rows
+          .filter((r: any) => r.isactive !== false)
+          .map((r: any) => ({
+            itemid: r.itemid,
+            itemname: r.itemname,
+            price: Number(r.price),
+            category: r.category,
+            description: r.description ?? '',
+          }))
+        setItems(normalized)
+      } catch (error) {
+        console.error('Error fetching items, using hardcoded fallback:', error)
+      }
+    }
+    fetchItems()
+  }, [])
 
   // Weather API
   useEffect(() => {
@@ -53,22 +63,6 @@ export default function KioskPage() {
       }
     }
     fetchWeather()
-  }, [])
-
-  useEffect(() => {
-    async function fetchItems() {
-      try {
-        const response = await fetch('/api/items')
-        const data = await response.json()
-        // Convert price to number since database returns it as string
-        setItems(data.map((item: any) => ({ ...item, price: Number(item.price) })))
-      } catch (error) {
-        console.error('Error fetching items:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchItems()
   }, [])
 
   // Google Translate widget
@@ -145,6 +139,55 @@ export default function KioskPage() {
     setCustomizingItem(null)
   }
 
+  const DEFAULT_CUSTOM_STRING = 'Medium, Normal Ice, 100% Sugar, Regular Boba'
+
+  function addToCartFromChat(item: MenuItem): string {
+    const customString = DEFAULT_CUSTOM_STRING
+    const cartId = `${item.itemid}-${customString}`
+    setCart(prev => {
+      const existing = prev.find(o => o.cartId === cartId)
+      if (existing) {
+        return prev.map(o => (o.cartId === cartId ? { ...o, qty: o.qty + 1 } : o))
+      }
+      return [
+        ...prev,
+        {
+          itemId: item.itemid,
+          itemName: item.itemname,
+          price: item.price,
+          qty: 1,
+          customizations: customString,
+          cartId,
+        },
+      ]
+    })
+    setAddedNotification(item.itemname)
+    setTimeout(() => setAddedNotification(null), 2000)
+    return cartId
+  }
+
+  function modifyChatCartLine(oldCartId: string, newCustomString: string): string | null {
+    let newCartId: string | null = null
+    setCart(prev => {
+      const line = prev.find(o => o.cartId === oldCartId)
+      if (!line) return prev
+      newCartId = `${line.itemId}-${newCustomString}`
+      if (newCartId === oldCartId) return prev
+      const withoutOld = prev.filter(o => o.cartId !== oldCartId)
+      const existing = withoutOld.find(o => o.cartId === newCartId)
+      if (existing) {
+        return withoutOld.map(o =>
+          o.cartId === newCartId ? { ...o, qty: o.qty + line.qty } : o
+        )
+      }
+      return [
+        ...withoutOld,
+        { ...line, customizations: newCustomString, cartId: newCartId },
+      ]
+    })
+    return newCartId
+  }
+
   function incrementCart(cartId: string) {
     setCart(prev =>
       prev.map(o => (o.cartId === cartId ? { ...o, qty: o.qty + 1 } : o))
@@ -189,6 +232,14 @@ export default function KioskPage() {
 
   return (
     <div className="flex h-screen bg-white font-sans">
+      <ChatWidget
+        menuItems={items}
+        cart={cart}
+        weather={weather}
+        onAddToCart={addToCartFromChat}
+        onModifyCartLine={modifyChatCartLine}
+        onSelectCategory={setSelectedCategory}
+      />
       {/* Customization Modal */}
       {customizingItem && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm">
@@ -341,11 +392,7 @@ export default function KioskPage() {
 
         {/* Menu grid - Show categories or items */}
         <div className="flex-1 overflow-y-auto px-6 py-6">
-          {loading ? (
-            <div className="flex items-center justify-center h-full">
-              <p className="text-gray-500 font-medium">Loading menu...</p>
-            </div>
-          ) : !selectedCategory ? (
+          {!selectedCategory ? (
             // Show categories
             <div className="grid grid-cols-3 gap-6">
               {categories.map(cat => (
