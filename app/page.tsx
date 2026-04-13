@@ -9,12 +9,15 @@ export default function Home() {
 					<h1 className="text-4xl font-semibold text-gray-900">POS System</h1>
 					<p className="text-gray-600">Select a view to continue</p>
 
-					<div className="mt-8 w-full grid grid-cols-1 sm:grid-cols-3 gap-6">
+					<div className="mt-8 w-full grid grid-cols-1 sm:grid-cols-4 gap-6">
 						<Link href="/cashier" className="block h-40 rounded-2xl shadow-md bg-blue-600 text-white flex items-center justify-center text-2xl font-semibold transform transition hover:scale-105">
 							Cashier View
 						</Link>
 						<Link href="/manager" className="block h-40 rounded-2xl shadow-md bg-green-600 text-white flex items-center justify-center text-2xl font-semibold transform transition hover:scale-105">
 							Manager View
+						</Link>
+						<Link href="/menuBoard" className="block h-40 rounded-2xl shadow-md bg-pink-300 text-gray-900 flex items-center justify-center text-2xl font-semibold transform transition hover:scale-105">
+							Menu Board
 						</Link>
 						<Link href="/customer" className="block h-40 rounded-2xl shadow-md bg-gray-100 text-gray-900 flex items-center justify-center text-2xl font-semibold transform transition hover:scale-105">
 							Customer View
