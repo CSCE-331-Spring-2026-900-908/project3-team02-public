@@ -1,40 +1,128 @@
+// src/app/manager/(protected)/inventory/page.tsx
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
-// --- Placeholder Data ---
-const INVENTORY_DATA = [
-  { id: 1, name: 'Black Tea Leaves', stock: 120, used: 450 },
-  { id: 2, name: 'Boba Pearls', stock: 15, used: 890 }, // Low stock example
-  { id: 3, name: 'Brown Sugar Syrup', stock: 45, used: 320 },
-  { id: 4, name: 'Whole Milk', stock: 8, used: 600 },
-  { id: 5, name: 'Taro Powder', stock: 55, used: 210 },
-  { id: 6, name: 'Passion Fruit Syrup', stock: 30, used: 150 },
-  { id: 7, name: 'Ice', stock: 500, used: 2500 },
-]
+interface InventoryItem {
+  ingredientid: number;
+  ingredient: string;
+  units: string;
+  current_stock: number;
+  estimated_used: number;
+}
 
 export default function InventoryPage() {
+  const [inventory, setInventory] = useState<InventoryItem[]>([])
   const [searchTerm, setSearchTerm] = useState('')
+  const [isLoading, setIsLoading] = useState(true)
 
-  const filteredData = INVENTORY_DATA.filter(item => 
-    item.name.toLowerCase().includes(searchTerm.toLowerCase())
+  // Modal States
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [editItem, setEditItem] = useState<InventoryItem | null>(null)
+  
+  // Form States
+  const [formName, setFormName] = useState('')
+  const [formQty, setFormQty] = useState('')
+
+  const fetchInventory = async () => {
+    setIsLoading(true)
+    try {
+      const res = await fetch('/api/inventory')
+      const data = await res.json()
+      setInventory(data)
+    } catch (error) {
+      console.error('Failed to fetch inventory', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchInventory()
+  }, [])
+
+  // Calculate Statistics
+  let lowestStock = { name: '--', stock: Infinity }
+  let mostUsed = { name: '--', used: -1 }
+  let leastUsed = { name: '--', used: Infinity }
+
+  inventory.forEach(item => {
+    if (item.current_stock < lowestStock.stock) lowestStock = { name: item.ingredient, stock: item.current_stock }
+    if (item.estimated_used > mostUsed.used) mostUsed = { name: item.ingredient, used: item.estimated_used }
+    if (item.estimated_used < leastUsed.used) leastUsed = { name: item.ingredient, used: item.estimated_used }
+  })
+
+  const filteredData = inventory.filter(item => 
+    item.ingredient.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
+  const handleAddSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const res = await fetch('/api/inventory', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ itemName: formName, quantity: parseInt(formQty) })
+    })
+    
+    if (res.ok) {
+      setIsAddModalOpen(false)
+      setFormName(''); setFormQty('')
+      fetchInventory()
+    } else {
+      const data = await res.json()
+      alert(data.error || 'Failed to add item')
+    }
+  }
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editItem) return
+
+    const res = await fetch('/api/inventory', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ingredientId: editItem.ingredientid, itemName: formName, quantity: parseInt(formQty) })
+    })
+    
+    if (res.ok) {
+      setEditItem(null)
+      fetchInventory()
+    } else {
+      alert('Failed to update item')
+    }
+  }
+
+  const openEditModal = (item: InventoryItem) => {
+    setEditItem(item)
+    setFormName(item.ingredient)
+    setFormQty(item.current_stock.toString())
+  }
+
   return (
-    <div className="space-y-6 p-8 h-full flex flex-col">
+    <div className="space-y-6 p-8 h-full flex flex-col relative">
       {/* Stat Cards */}
       <div className="grid grid-cols-3 gap-6">
-        <StatCard title="Low Stock" main="Whole Milk" sub="8 units left" alert />
-        <StatCard title="Most Used Ingredient" main="Ice" sub="2,500 units used" />
-        <StatCard title="Least Used Ingredient" main="Passion Fruit Syrup" sub="150 units used" />
+        <StatCard 
+          title="Low Stock" 
+          main={lowestStock.stock === Infinity ? '--' : lowestStock.name} 
+          sub={lowestStock.stock === Infinity ? '--' : `${lowestStock.stock} units left`} 
+          alert={lowestStock.stock < 20} 
+        />
+        <StatCard 
+          title="Most Used Ingredient" 
+          main={mostUsed.used === -1 ? '--' : mostUsed.name} 
+          sub={mostUsed.used === -1 ? '--' : `${mostUsed.used} units used`} 
+        />
+        <StatCard 
+          title="Least Used Ingredient" 
+          main={leastUsed.used === Infinity ? '--' : leastUsed.name} 
+          sub={leastUsed.used === Infinity ? '--' : `${leastUsed.used} units used`} 
+        />
       </div>
 
       {/* Controls */}
       <div className="flex items-center justify-between bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
         <div className="flex gap-4">
-          <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors cursor-pointer">
-            Date Range
-          </button>
           <input 
             type="text" 
             placeholder="Search Items..." 
@@ -43,7 +131,10 @@ export default function InventoryPage() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <button className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors cursor-pointer shadow-sm">
+        <button 
+          onClick={() => { setFormName(''); setFormQty(''); setIsAddModalOpen(true); }}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors cursor-pointer shadow-sm"
+        >
           + Add Item
         </button>
       </div>
@@ -60,26 +151,55 @@ export default function InventoryPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredData.map(item => (
-                <tr key={item.id} className="hover:bg-blue-50 cursor-pointer transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${item.stock < 20 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                      {item.stock}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.used}</td>
-                </tr>
-              ))}
-              {filteredData.length === 0 && (
-                <tr>
-                  <td colSpan={3} className="px-6 py-8 text-center text-sm text-gray-500">No ingredients found.</td>
-                </tr>
+              {isLoading ? (
+                <tr><td colSpan={3} className="px-6 py-8 text-center text-sm text-gray-500">Loading inventory...</td></tr>
+              ) : filteredData.length === 0 ? (
+                <tr><td colSpan={3} className="px-6 py-8 text-center text-sm text-gray-500">No ingredients found.</td></tr>
+              ) : (
+                filteredData.map(item => (
+                  <tr 
+                    key={item.ingredientid} 
+                    onDoubleClick={() => openEditModal(item)}
+                    className="hover:bg-blue-50 cursor-pointer transition-colors"
+                    title="Double click to edit"
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.ingredient}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${item.current_stock < 20 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                        {item.current_stock}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.estimated_used}</td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Reusable Modal Component for Add/Edit */}
+      {(isAddModalOpen || editItem) && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-xl p-6 w-full max-w-sm shadow-xl">
+            <h2 className="text-xl font-bold mb-4">{editItem ? 'Edit Inventory' : 'Add Inventory Item'}</h2>
+            <form onSubmit={editItem ? handleEditSubmit : handleAddSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Item Name</label>
+                <input required type="text" value={formName} onChange={e => setFormName(e.target.value)} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+                <input required type="number" value={formQty} onChange={e => setFormQty(e.target.value)} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+              </div>
+              <div className="flex gap-3 pt-4">
+                <button type="button" onClick={() => { setIsAddModalOpen(false); setEditItem(null); }} className="flex-1 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 cursor-pointer">Cancel</button>
+                <button type="submit" className="flex-1 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 cursor-pointer">{editItem ? 'Save' : 'Add'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
