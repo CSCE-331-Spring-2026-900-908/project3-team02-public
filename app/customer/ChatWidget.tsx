@@ -17,13 +17,6 @@ type ChatButton =
   | { label: string; action: 'modify_item'; update: CustomizationUpdate }
   | { label: string; action: 'checkout' }
 
-type CartAction = {
-  type: 'add'
-  itemId: number
-  itemName: string
-  price: number
-}
-
 interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
@@ -187,9 +180,9 @@ export default function ChatWidget({ menuItems, cart, weather, onAddToCart, onMo
 
   async function sendToApi(
     history: ChatMessage[],
-    options: { isGreeting?: boolean; skipCartActions?: boolean; cartOverride?: OrderItem[] } = {}
+    options: { isGreeting?: boolean; cartOverride?: OrderItem[] } = {}
   ) {
-    const { isGreeting = false, skipCartActions = false, cartOverride } = options
+    const { isGreeting = false, cartOverride } = options
     setIsLoading(true)
     try {
       const cartForSummary = cartOverride ?? cartRef.current
@@ -203,25 +196,6 @@ export default function ChatWidget({ menuItems, cart, weather, onAddToCart, onMo
         }),
       })
       const data = await response.json()
-
-      if (!skipCartActions && Array.isArray(data.cartActions)) {
-        for (const action of data.cartActions as CartAction[]) {
-          if (action.type === 'add') {
-            const match = menuItems.find(i => i.itemid === action.itemId)
-            if (match) {
-              const newCartId = onAddToCart(match)
-              setLastAdded({
-                cartId: newCartId,
-                itemName: match.itemname,
-                size: 'Medium',
-                ice: 'Normal Ice',
-                sugar: '100% Sugar',
-                boba: 'Regular Boba',
-              })
-            }
-          }
-        }
-      }
 
       const assistantMessage: ChatMessage = {
         role: 'assistant',
@@ -284,7 +258,7 @@ export default function ChatWidget({ menuItems, cart, weather, onAddToCart, onMo
           cartId: `chat-${match.itemid}`,
         },
       ]
-      sendToApi(next, { skipCartActions: true, cartOverride: projected })
+      sendToApi(next, { cartOverride: projected })
     } else if (button.action === 'modify_item') {
       if (!lastAdded) return
       const updated = {
@@ -306,7 +280,7 @@ export default function ChatWidget({ menuItems, cart, weather, onAddToCart, onMo
         { role: 'user', content: `${button.label} on my ${lastAdded.itemName}.` },
       ]
       setMessages(next)
-      sendToApi(next, { skipCartActions: true })
+      sendToApi(next)
     } else if (button.action === 'checkout') {
       setIsOpen(false)
       if (onRequestClose) onRequestClose()

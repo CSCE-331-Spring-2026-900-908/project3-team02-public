@@ -79,13 +79,12 @@ You MUST respond with valid JSON in this exact format and nothing else:
     {"label": "Button text", "action": "modify_item", "update": {"sugar": "50% Sugar"}},
     {"label": "Button text", "action": "checkout"},
     {"label": "Button text", "action": "show_category", "category": "Milk Tea"}
-  ],
-  "cartActions": []
+  ]
 }
 
 ## BUTTON ACTION TYPES
-- **add_item**: {itemId: number} — adds a drink with default customizations. Use for concrete drink recommendations.
-- **send_message**: {messageText: string} — simulates the customer saying something. Use for narrowing ("Creamy", "Refreshing", "Low sugar") and for follow-up paths.
+- **add_item**: {itemId: number} — adds a drink with default customizations. This is the ONLY way to add a drink to the cart. Every concrete drink recommendation MUST be an add_item button.
+- **send_message**: {messageText: string} — simulates the customer saying something. Use for narrowing ("Creamy", "Refreshing", "Low sugar") and for follow-up paths. NEVER use send_message for adding a drink — "Add X to cart" style send_message buttons are forbidden. Adds go through add_item only.
 - **modify_item**: {update: {size?, ice?, sugar?, boba?}} — modifies the customer's JUST-ADDED drink. Use ONLY right after an add. Allowed values:
   - size: "Medium" | "Large"
   - ice: "Normal Ice" | "Less Ice" | "No Ice"
@@ -112,10 +111,9 @@ If the customer is already decisive (e.g. "something fruity"), SKIP narrowing an
 - Use the [tags] on each menu item to match customer intent (creamy, fruity, refreshing, caffeine-free, first-timer, dessert-like, snack). Prefer ★BESTSELLER items when the customer asks for "popular", "best", or "first-timer".
 - When a customer mentions a restriction ("no caffeine", "low sugar", "not too sweet"), filter recommendations using the relevant tag or emit an initial modify_item button. Caffeine-free drinks are marked with the [caffeine-free] tag.
 
-## CART ACTION RULES
-- Only include cartActions when the customer explicitly confirms they want to add something.
-- Each cart action needs: type "add", itemId (number), itemName (string), price (number). Must match a real item.
-- Do NOT include cartActions just because you recommended a drink — wait for the customer to confirm.
+## CART RULES
+- Adds to the cart happen ONLY when the customer clicks an add_item button. You cannot add drinks yourself.
+- NEVER claim to have added a drink in your message text unless the latest user message says "I just added X to my cart" (which is the confirmation that the button click succeeded).
 - The "CUSTOMER'S CURRENT CART" section is the AUTHORITATIVE current state and already reflects any add the user just confirmed. Do NOT add to those counts when the user's latest message says "I just added X" — that add is already in the cart summary. Read counts directly from the cart summary.
 
 ## PERSONALITY
@@ -193,14 +191,11 @@ export async function POST(request: Request) {
       return Response.json({
         message: parsed.message ?? rawText,
         buttons: parsed.buttons ?? FALLBACK_BUTTONS,
-        cartActions: parsed.cartActions ?? [],
       })
     } catch {
-      // If JSON parsing fails, return the raw text with fallback buttons
       return Response.json({
         message: rawText,
         buttons: FALLBACK_BUTTONS,
-        cartActions: [],
       })
     }
   } catch (error) {
@@ -209,7 +204,6 @@ export async function POST(request: Request) {
       {
         message: "Sorry, I'm having trouble right now. Please try again or browse the menu directly!",
         buttons: FALLBACK_BUTTONS,
-        cartActions: [],
       },
       { status: 500 }
     )
