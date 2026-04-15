@@ -144,6 +144,31 @@ const FALLBACK_BUTTONS = [
   { label: 'Help me choose', action: 'send_message' as const, messageText: 'Help me pick a drink' },
 ]
 
+function tryParseChatJson(text: string): { message?: string; buttons?: unknown } | null {
+  try {
+    return JSON.parse(text)
+  } catch {
+    const start = text.indexOf('{')
+    const end = text.lastIndexOf('}')
+    if (start === -1 || end === -1 || end <= start) return null
+    try {
+      return JSON.parse(text.slice(start, end + 1))
+    } catch {
+      return null
+    }
+  }
+}
+
+function extractMessageField(text: string): string | null {
+  const match = text.match(/"message"\s*:\s*"((?:[^"\\]|\\.)*)"/)
+  if (!match) return null
+  try {
+    return JSON.parse(`"${match[1]}"`)
+  } catch {
+    return match[1]
+  }
+}
+
 function describeWeather(w?: WeatherContext): string {
   if (!w || typeof w.temperatureF !== 'number') return 'Unknown'
   const t = w.temperatureF
@@ -183,21 +208,21 @@ export async function POST(request: Request) {
     const textBlock = response.content.find(block => block.type === 'text')
     const rawText = textBlock?.text ?? ''
 
-    // Strip markdown code fences if present
     const cleaned = rawText.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '').trim()
 
-    try {
-      const parsed = JSON.parse(cleaned)
+    const parsed = tryParseChatJson(cleaned)
+    if (parsed) {
       return Response.json({
-        message: parsed.message ?? rawText,
+        message: parsed.message ?? "Sorry, I didn't catch that. Want to try again?",
         buttons: parsed.buttons ?? FALLBACK_BUTTONS,
       })
-    } catch {
-      return Response.json({
-        message: rawText,
-        buttons: FALLBACK_BUTTONS,
-      })
     }
+
+    const salvagedMessage = extractMessageField(cleaned)
+    return Response.json({
+      message: salvagedMessage ?? "Sorry, I'm having trouble responding right now. Try one of these?",
+      buttons: FALLBACK_BUTTONS,
+    })
   } catch (error) {
     console.error('Chat API error:', error)
     return Response.json(
