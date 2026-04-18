@@ -32,7 +32,7 @@ export default function CashierPage() {
   const [drinkSize, setDrinkSize] = useState('Medium')
   const [iceLevel, setIceLevel] = useState('Normal Ice')
   const [sugarLevel, setSugarLevel] = useState('100% Sugar')
-  const [bobaOption, setBobaOption] = useState('Regular Boba')
+  const [bobaOption, setBobaOption] = useState('')
 
   useEffect(() => {
     async function fetchMenuItems() {
@@ -106,13 +106,16 @@ export default function CashierPage() {
     setDrinkSize('Medium')
     setIceLevel('Normal Ice')
     setSugarLevel('100% Sugar')
-    setBobaOption('Regular Boba')
+    setBobaOption('')
   }
 
   function confirmCustomization() {
     if (!customizingItem) return
     
-    const customString = `${drinkSize}, ${iceLevel}, ${sugarLevel}, ${bobaOption}`
+    const customParts = [drinkSize, iceLevel, sugarLevel]
+    if (bobaOption) customParts.push(bobaOption)
+    const customString = customParts.join(', ')
+    
     const cartId = `${customizingItem.id}-${customString}`
 
     setCart(prev => {
@@ -213,7 +216,7 @@ export default function CashierPage() {
               <div className="flex items-center gap-4">
                 <span className="font-medium text-gray-500 text-base w-14 uppercase tracking-wider">Ice</span>
                 <div className="flex gap-2 flex-1">
-                  {['Normal Ice', 'Less Ice', 'No Ice'].map(opt => (
+                  {['Normal Ice', 'Extra Ice', 'Less Ice', 'No Ice'].map(opt => (
                     <button key={opt} onClick={() => setIceLevel(opt)} className={`flex-1 py-2.5 px-2 border rounded font-medium text-base transition-colors ${iceLevel === opt ? 'bg-gray-900 border-gray-900 text-white' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}>{opt}</button>
                   ))}
                 </div>
@@ -222,7 +225,7 @@ export default function CashierPage() {
               <div className="flex items-center gap-4">
                 <span className="font-medium text-gray-500 text-base w-14 uppercase tracking-wider">Sugar</span>
                 <div className="flex gap-2 flex-1">
-                  {['100% Sugar', '75% Sugar', '50% Sugar', '25% Sugar', '0% Sugar'].map(opt => (
+                  {['120% Sugar', '100% Sugar', '75% Sugar', '50% Sugar', '25% Sugar', '0% Sugar'].map(opt => (
                     <button key={opt} onClick={() => setSugarLevel(opt)} className={`flex-1 py-2.5 px-1 border rounded font-medium text-sm transition-colors ${sugarLevel === opt ? 'bg-gray-900 border-gray-900 text-white' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}>{opt.replace(' Sugar', '')}</button>
                   ))}
                 </div>
@@ -230,10 +233,32 @@ export default function CashierPage() {
 
               <div className="flex items-center gap-4">
                 <span className="font-medium text-gray-500 text-base w-14 uppercase tracking-wider">Boba</span>
-                <div className="flex gap-2 flex-1">
-                  {['Regular Boba', 'Extra Boba', 'No Boba'].map(opt => (
-                    <button key={opt} onClick={() => setBobaOption(opt)} className={`flex-1 py-2.5 px-2 border rounded font-medium text-base transition-colors ${bobaOption === opt ? 'bg-gray-900 border-gray-900 text-white' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}>{opt}</button>
-                  ))}
+                <div className="flex gap-2 flex-1 pt-2 pb-1">
+                  {['Regular Boba', 'Extra Boba'].map(opt => {
+                    const isSelected = bobaOption === opt;
+                    return (
+                      <div key={opt} className="relative flex-1">
+                        <button 
+                          onClick={() => setBobaOption(isSelected ? '' : opt)} 
+                          className={`w-full h-full py-2.5 px-2 border rounded font-medium text-base transition-all ${
+                            isSelected 
+                              ? 'bg-gray-900 border-gray-900 text-white opacity-100' 
+                              : 'bg-gray-50 border-gray-200 text-gray-400 hover:bg-gray-100 hover:text-gray-700 opacity-60 hover:opacity-100'
+                          }`}
+                        >
+                          {opt}
+                        </button>
+                        {isSelected && (
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); setBobaOption(''); }}
+                            className="absolute -top-2 -right-2 w-6 h-6 bg-white border border-gray-200 text-gray-500 rounded-full flex items-center justify-center text-sm font-bold shadow-sm hover:text-red-500 hover:border-red-200 transition-colors z-10"
+                          >
+                            &times;
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             </div>
