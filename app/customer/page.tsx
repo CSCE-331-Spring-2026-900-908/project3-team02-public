@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { MenuItem, OrderItem } from './types'
 import { MENU_ITEMS } from '../data/menu'
@@ -23,6 +23,69 @@ export default function KioskPage() {
   // Add these with your other state declarations
   const [weather, setWeather] = useState<any>(null)
   const [weatherLoading, setWeatherLoading] = useState(true)
+
+  // Accessibility states
+  const [accessibilityOpen, setAccessibilityOpen] = useState(false)
+  const [textSize, setTextSize] = useState('normal')
+  const [highContrast, setHighContrast] = useState(false)
+  const textSizeInputRef = useRef<HTMLInputElement>(null)
+
+  // Apply accessibility settings via CSS variables
+  useEffect(() => {
+    const root = document.documentElement
+    
+    // Text size multiplier
+    const sizeMultiplier = textSize === 'large' ? 1.2 : textSize === 'xlarge' ? 1.5 : 1
+    root.style.setProperty('--text-scale', sizeMultiplier.toString())
+    
+    if (highContrast) {
+      root.style.setProperty('--bg-primary', '#000000')
+      root.style.setProperty('--bg-secondary', '#1a1a1a')
+      root.style.setProperty('--text-primary', '#ffffff')
+      root.style.setProperty('--text-secondary', '#ffffff')
+      root.style.setProperty('--text-muted', '#d1d5db')
+      root.style.setProperty('--border-color', '#ffffff')
+      root.style.setProperty('--accent-color', '#ffff00')
+      root.style.setProperty('--button-primary-bg', '#ffffff')
+      root.style.setProperty('--button-primary-text', '#000000')
+      root.style.setProperty('--button-secondary-bg', '#1a1a1a')
+      root.style.setProperty('--button-secondary-text', '#ffffff')
+      root.style.setProperty('--button-danger-bg', '#1a1a1a')
+      root.style.setProperty('--button-danger-text', '#ffffff')
+      root.style.setProperty('--button-success-bg', '#1a1a1a')
+      root.style.setProperty('--button-success-text', '#ffffff')
+      root.style.setProperty('--card-bg', '#1a1a1a')
+      root.style.setProperty('--card-border', '#ffffff')
+      root.style.setProperty('--card-text', '#ffffff')
+      root.style.setProperty('--input-bg', '#1a1a1a')
+      root.style.setProperty('--input-border', '#ffffff')
+      root.style.setProperty('--input-text', '#ffffff')
+      root.style.setProperty('--header-border', '#ffffff')
+    } else {
+      root.style.setProperty('--bg-primary', '#ffffff')
+      root.style.setProperty('--bg-secondary', '#f3f4f6')
+      root.style.setProperty('--text-primary', '#000000')
+      root.style.setProperty('--text-secondary', '#666666')
+      root.style.setProperty('--text-muted', '#9ca3af')
+      root.style.setProperty('--border-color', '#d1d5db')
+      root.style.setProperty('--accent-color', '#2563eb')
+      root.style.setProperty('--button-primary-bg', '#2563eb')
+      root.style.setProperty('--button-primary-text', '#ffffff')
+      root.style.setProperty('--button-secondary-bg', '#f3f4f6')
+      root.style.setProperty('--button-secondary-text', '#374151')
+      root.style.setProperty('--button-danger-bg', '#fee2e2')
+      root.style.setProperty('--button-danger-text', '#dc2626')
+      root.style.setProperty('--button-success-bg', '#dcfce7')
+      root.style.setProperty('--button-success-text', '#16a34a')
+      root.style.setProperty('--card-bg', '#f9fafb')
+      root.style.setProperty('--card-border', '#e5e7eb')
+      root.style.setProperty('--card-text', '#111827')
+      root.style.setProperty('--input-bg', '#f9fafb')
+      root.style.setProperty('--input-border', '#d1d5db')
+      root.style.setProperty('--input-text', '#000000')
+      root.style.setProperty('--header-border', '#e5e7eb')
+    }
+  }, [textSize, highContrast])
 
   // Items from DB (falls back to hardcoded MENU_ITEMS on failure)
   useEffect(() => {
@@ -231,7 +294,14 @@ export default function KioskPage() {
   }
 
   return (
-    <div className="flex h-screen bg-white font-sans">
+    <div 
+      style={{
+        backgroundColor: 'var(--bg-primary)',
+        color: 'var(--text-primary)',
+        fontSize: `calc(16px * var(--text-scale))`,
+      }}
+      className="flex h-screen font-sans"
+    >
       <ChatWidget
         menuItems={items}
         cart={cart}
@@ -239,21 +309,32 @@ export default function KioskPage() {
         onAddToCart={addToCartFromChat}
         onModifyCartLine={modifyChatCartLine}
         onSelectCategory={setSelectedCategory}
+        textSize={textSize}
+        highContrast={highContrast}
       />
       {/* Customization Modal */}
       {customizingItem && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm">
-          <div className="bg-white rounded-2xl p-6 w-96 shadow-xl border-2 border-gray-100">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">{customizingItem.itemname}</h2>
-            <p className="text-gray-500 mb-6">Customize your drink</p>
+          <div className="rounded-2xl p-6 w-96 shadow-xl border-2" style={{
+            backgroundColor: 'var(--bg-primary)',
+            borderColor: 'var(--card-border)',
+            color: 'var(--card-text)'
+          }}>
+            <h2 className="text-2xl font-bold mb-2">{customizingItem.itemname}</h2>
+            <p className="mb-6" style={{ color: 'var(--text-muted)' }}>Customize your drink</p>
             
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Drink Size</label>
+                <label className="block text-sm font-semibold mb-2">Drink Size</label>
                 <select 
                   value={drinkSize} 
                   onChange={(e) => setDrinkSize(e.target.value)}
-                  className="w-full text-black p-3 rounded-lg border border-gray-300 bg-gray-50 focus:ring-2 focus:ring-blue-500"
+                  className="w-full p-3 rounded-lg border" 
+                  style={{
+                    backgroundColor: 'var(--input-bg)',
+                    borderColor: 'var(--input-border)',
+                    color: 'var(--input-text)'
+                  }}
                 >
                   <option>Medium</option>
                   <option>Large</option>
@@ -261,11 +342,16 @@ export default function KioskPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Ice Level</label>
+                <label className="block text-sm font-semibold mb-2">Ice Level</label>
                 <select 
                   value={iceLevel} 
                   onChange={(e) => setIceLevel(e.target.value)}
-                  className="w-full text-black p-3 rounded-lg border border-gray-300 bg-gray-50 focus:ring-2 focus:ring-blue-500"
+                  className="w-full p-3 rounded-lg border"
+                  style={{
+                    backgroundColor: 'var(--input-bg)',
+                    borderColor: 'var(--input-border)',
+                    color: 'var(--input-text)'
+                  }}
                 >
                   <option>Normal Ice</option>
                   <option>Less Ice</option>
@@ -274,11 +360,16 @@ export default function KioskPage() {
               </div>
               
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Sugar Level</label>
+                <label className="block text-sm font-semibold mb-2">Sugar Level</label>
                 <select 
                   value={sugarLevel} 
                   onChange={(e) => setSugarLevel(e.target.value)}
-                  className="w-full text-black p-3 rounded-lg border border-gray-300 bg-gray-50 focus:ring-2 focus:ring-blue-500"
+                  className="w-full p-3 rounded-lg border"
+                  style={{
+                    backgroundColor: 'var(--input-bg)',
+                    borderColor: 'var(--input-border)',
+                    color: 'var(--input-text)'
+                  }}
                 >
                   <option>100% Sugar</option>
                   <option>75% Sugar</option>
@@ -289,49 +380,29 @@ export default function KioskPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Boba</label>
+                <label className="block text-sm font-semibold mb-2">Boba</label>
                 <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    aria-pressed={bobaOption === 'Regular Boba'}
-                    onClick={() => setBobaOption('Regular Boba')}
-                    className={`rounded-lg border p-3 flex flex-col items-center justify-center transition-colors ${
-                      bobaOption === 'Regular Boba'
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    <span className="text-xl">🧋</span>
-                    <span className="text-xs mt-1 font-medium">Regular</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    aria-pressed={bobaOption === 'Extra Boba'}
-                    onClick={() => setBobaOption('Extra Boba')}
-                    className={`rounded-lg border p-3 flex flex-col items-center justify-center transition-colors ${
-                      bobaOption === 'Extra Boba'
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    <span className="text-xl">🧋+</span>
-                    <span className="text-xs mt-1 font-medium">Extra</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    aria-pressed={bobaOption === 'No Boba'}
-                    onClick={() => setBobaOption('No Boba')}
-                    className={`rounded-lg border p-3 flex flex-col items-center justify-center transition-colors ${
-                      bobaOption === 'No Boba'
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    <span className="text-xl">🚫🧋</span>
-                    <span className="text-xs mt-1 font-medium">None</span>
-                  </button>
+                  {[
+                    { value: 'Regular Boba' as const, emoji: '🧋', label: 'Regular' },
+                    { value: 'Extra Boba' as const, emoji: '🧋+', label: 'Extra' },
+                    { value: 'No Boba' as const, emoji: '🚫🧋', label: 'None' },
+                  ].map(option => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      aria-pressed={bobaOption === option.value}
+                      onClick={() => setBobaOption(option.value)}
+                      className="rounded-lg border p-3 flex flex-col items-center justify-center transition-colors"
+                      style={{
+                        borderColor: bobaOption === option.value ? 'var(--accent-color)' : 'var(--card-border)',
+                        backgroundColor: bobaOption === option.value ? 'var(--accent-color)' : 'var(--card-bg)',
+                        color: bobaOption === option.value ? '#ffffff' : 'var(--card-text)'
+                      }}
+                    >
+                      <span className="text-xl">{option.emoji}</span>
+                      <span className="text-xs mt-1 font-medium">{option.label}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
@@ -339,13 +410,21 @@ export default function KioskPage() {
             <div className="mt-8 flex gap-3">
               <button 
                 onClick={() => setCustomizingItem(null)}
-                className="flex-1 py-3 rounded-xl bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200 transition-colors cursor-pointer"
+                className="flex-1 py-3 rounded-xl font-semibold hover:opacity-80 transition-colors cursor-pointer"
+                style={{
+                  backgroundColor: 'var(--button-secondary-bg)',
+                  color: 'var(--button-secondary-text)'
+                }}
               >
                 Cancel
               </button>
               <button 
                 onClick={confirmCustomization}
-                className="flex-1 py-3 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors cursor-pointer"
+                className="flex-1 py-3 rounded-xl font-semibold hover:opacity-80 transition-colors cursor-pointer"
+                style={{
+                  backgroundColor: 'var(--button-primary-bg)',
+                  color: 'var(--button-primary-text)'
+                }}
               >
                 Add to Cart
               </button>
@@ -357,7 +436,10 @@ export default function KioskPage() {
       {/* Notification popup */}
       {addedNotification && (
         <div className="fixed top-8 left-1/2 transform -translate-x-1/2 z-50 animate-bounce">
-          <div className="bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg font-semibold text-center">
+          <div className="px-6 py-3 rounded-lg shadow-lg font-semibold text-center" style={{
+            backgroundColor: 'var(--button-success-bg)',
+            color: 'var(--button-success-text)'
+          }}>
             ✓ {addedNotification} added to cart!
           </div>
         </div>
@@ -365,25 +447,32 @@ export default function KioskPage() {
       {/* Left panel - Menu */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="px-6 py-4 border-b border-gray-200 flex items-center gap-4">
+        <header className="px-6 py-4 border-b flex items-center gap-4" style={{ borderColor: 'var(--header-border)' }}>
           <div className="flex items-center gap-4 flex-1 min-w-0">
             {selectedCategory && (
               <button
                 onClick={() => setSelectedCategory(null)}
-                className="text-2xl font-bold text-gray-600 hover:text-gray-900 transition-colors flex-shrink-0"
+                className="text-2xl font-bold transition-colors flex-shrink-0"
+                style={{
+                  color: 'var(--text-primary)',
+                }}
               >
                 ←
               </button>
             )}
-            <h1 className="text-2xl font-bold text-gray-900 truncate">
+            <h1 className="text-2xl font-bold truncate" style={{ color: 'var(--text-primary)' }}>
               {selectedCategory ? selectedCategory : 'Order Kiosk'}
             </h1>
           </div>
           {!weatherLoading && weather && (
-            <div className="px-3 py-2 bg-blue-50 rounded-lg border border-blue-200 text-sm flex-shrink-0">
-              <p className="font-semibold text-blue-900">{weather.current.temperature?.toFixed(1)}°F</p>
+            <div className="px-3 py-2 rounded-lg border text-sm flex-shrink-0" style={{
+              backgroundColor: 'var(--bg-secondary)',
+              borderColor: 'var(--accent-color)',
+              color: 'var(--accent-color)'
+            }}>
+              <p className="font-semibold">{weather.current.temperature?.toFixed(1)}°F</p>
               {weather.daily && (
-                <p className="text-xs text-blue-800">H: {weather.daily.temperature_2m_max?.[0]?.toFixed(1)}° / L: {weather.daily.temperature_2m_min?.[0]?.toFixed(1)}°</p>
+                <p className="text-xs">H: {weather.daily.temperature_2m_max?.[0]?.toFixed(1)}° / L: {weather.daily.temperature_2m_min?.[0]?.toFixed(1)}°</p>
               )}
             </div>
           )}
@@ -399,11 +488,15 @@ export default function KioskPage() {
                 <button
                   key={cat}
                   onClick={() => setSelectedCategory(cat)}
-                  className="rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-gray-200 p-6 text-left
-                             hover:border-blue-400 hover:from-blue-50 hover:to-blue-100 transition-all cursor-pointer shadow-sm hover:shadow-md"
+                  className="rounded-2xl border-2 p-6 text-left transition-all cursor-pointer shadow-sm hover:shadow-md"
+                  style={{
+                    backgroundColor: 'var(--card-bg)',
+                    borderColor: 'var(--card-border)',
+                    color: 'var(--card-text)'
+                  }}
                 >
-                  <p className="font-bold text-gray-900 text-2xl leading-snug">{cat}</p>
-                  <p className="mt-3 text-gray-500 text-sm">{items.filter(i => i.category === cat).length} items</p>
+                  <p className="font-bold text-2xl leading-snug">{cat}</p>
+                  <p className="mt-3 text-sm" style={{ color: 'var(--text-muted)' }}>{items.filter(i => i.category === cat).length} items</p>
                 </button>
               ))}
             </div>
@@ -418,14 +511,18 @@ export default function KioskPage() {
                 <button
                   key={item.itemid}
                   onClick={() => openCustomization(item)}
-                  className="rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-gray-200 p-6 text-left
-                             hover:border-blue-400 hover:from-blue-50 hover:to-blue-100 transition-all cursor-pointer shadow-sm hover:shadow-md"
+                  className="rounded-2xl border-2 p-6 text-left transition-all cursor-pointer shadow-sm hover:shadow-md"
+                  style={{
+                    backgroundColor: 'var(--card-bg)',
+                    borderColor: 'var(--card-border)',
+                    color: 'var(--card-text)'
+                  }}
                 >
-                  <p className="font-bold text-gray-900 text-lg leading-snug">{item.itemname}</p>
+                  <p className="font-bold text-lg leading-snug">{item.itemname}</p>
                   {item.description && (
-                    <p className="mt-2 text-gray-600 text-sm line-clamp-2">{item.description}</p>
+                    <p className="mt-2 text-sm line-clamp-2" style={{ color: 'var(--text-muted)' }}>{item.description}</p>
                   )}
-                  <p className="mt-3 text-blue-600 font-bold text-xl">${item.price.toFixed(2)}</p>
+                  <p className="mt-3 font-bold text-xl" style={{ color: 'var(--accent-color)' }}>${item.price.toFixed(2)}</p>
                 </button>
               ))}
             </div>
@@ -434,42 +531,60 @@ export default function KioskPage() {
       </div>
 
       {/* Right panel - Cart */}
-      <div className="w-96 border-l border-gray-200 flex flex-col bg-gray-50">
+      <div className="w-96 border-l flex flex-col" style={{
+        borderColor: 'var(--header-border)',
+        backgroundColor: 'var(--bg-secondary)'
+      }}>
         {/* Header */}
-        <header className="px-6 py-4 border-b border-gray-200">
-          <h2 className="font-bold text-gray-800 text-lg">Your Order</h2>
+        <header className="px-6 py-4 border-b" style={{
+          borderColor: 'var(--header-border)'
+        }}>
+          <h2 className="font-bold text-lg" style={{ color: 'var(--text-primary)' }}>Your Order</h2>
         </header>
 
         {/* Cart items */}
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
           {cart.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center mt-12 font-medium">No items selected</p>
+            <p className="text-sm text-center mt-12 font-medium" style={{ color: 'var(--text-muted)' }}>No items selected</p>
           ) : (
             cart.map(item => (
               <div
                 key={item.cartId}
-                className="flex items-center justify-between rounded-xl bg-white border border-gray-200 px-4 py-3 shadow-sm"
+                className="flex items-center justify-between rounded-xl border px-4 py-3 shadow-sm"
+                style={{
+                  backgroundColor: 'var(--bg-primary)',
+                  borderColor: 'var(--card-border)',
+                  color: 'var(--text-primary)'
+                }}
               >
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-800">{item.itemName}</p>
+                  <p className="font-semibold">{item.itemName}</p>
                   {item.customizations && (
-                    <p className="text-xs text-gray-500 mt-1">{item.customizations}</p>
+                    <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>{item.customizations}</p>
                   )}
-                  <p className="text-sm text-gray-600 mt-1">
+                  <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
                     ${item.price.toFixed(2)} each
                   </p>
                 </div>
                 <div className="flex items-center gap-2 ml-3">
                   <button
                     onClick={() => removeFromCart(item.cartId)}
-                    className="w-6 h-6 flex items-center justify-center rounded bg-red-100 text-red-600 hover:bg-red-200 font-bold text-sm cursor-pointer transition-colors"
+                    className="w-6 h-6 flex items-center justify-center rounded font-bold text-sm cursor-pointer transition-colors"
+                    style={{
+                      backgroundColor: 'var(--button-danger-bg)',
+                      color: 'var(--button-danger-text)'
+                    }}
                   >
                     −
                   </button>
                   <span className="w-8 text-center font-semibold text-gray-800">{item.qty}</span>
                   <button
                     onClick={() => incrementCart(item.cartId)}
-                    className="w-6 h-6 flex items-center justify-center rounded bg-green-100 text-green-600 hover:bg-green-200 font-bold text-sm cursor-pointer transition-colors"
+                    className="w-6 h-6 flex items-center justify-center rounded font-bold text-sm cursor-pointer transition-colors"
+                    style={{
+                      backgroundColor: 'var(--button-success-bg)',
+                      color: 'var(--button-success-text)'
+                    }}
                   >
                     +
                   </button>
@@ -480,29 +595,45 @@ export default function KioskPage() {
         </div>
 
         {/* Footer - Total and buttons */}
-        <div className="px-6 py-5 border-t border-gray-200 space-y-4">
+        <div className="px-6 py-5 border-t space-y-4" style={{
+          borderColor: 'var(--header-border)'
+        }}>
           {submitted && (
-            <div className="rounded-lg bg-green-100 border border-green-300 text-green-800 text-sm px-4 py-3 text-center font-semibold">
+            <div className="rounded-lg border text-sm px-4 py-3 text-center font-semibold" style={{
+              backgroundColor: 'var(--button-success-bg)',
+              borderColor: 'var(--button-success-text)',
+              color: 'var(--button-success-text)'
+            }}>
               Order placed successfully!
             </div>
           )}
 
-          <div className="bg-white rounded-lg p-4 border border-gray-200">
+          <div className="rounded-lg p-4 border" style={{
+            backgroundColor: 'var(--bg-primary)',
+            borderColor: 'var(--card-border)',
+            color: 'var(--text-primary)'
+          }}>
             <div className="flex justify-between items-center">
-              <span className="text-gray-600 font-medium">Subtotal</span>
-              <span className="text-gray-800">${orderTotal.toFixed(2)}</span>
+              <span className="font-medium" style={{ color: 'var(--text-secondary)' }}>Subtotal</span>
+              <span>${orderTotal.toFixed(2)}</span>
             </div>
-            <div className="border-t border-gray-100 mt-3 pt-3 flex justify-between items-center">
-              <span className="text-lg font-bold text-gray-900">Total</span>
-              <span className="text-2xl font-bold text-blue-600">${orderTotal.toFixed(2)}</span>
+            <div className="border-t mt-3 pt-3 flex justify-between items-center" style={{
+              borderColor: 'var(--bg-secondary)'
+            }}>
+              <span className="text-lg font-bold">Total</span>
+              <span className="text-2xl font-bold" style={{ color: 'var(--accent-color)' }}>${orderTotal.toFixed(2)}</span>
             </div>
           </div>
 
           <button
             onClick={submitOrder}
             disabled={cart.length === 0}
-            className="w-full py-4 rounded-xl bg-blue-600 text-white font-bold text-lg
-                       hover:bg-blue-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer shadow-md"
+            className="w-full py-4 rounded-xl font-bold text-lg
+                       hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer shadow-md"
+            style={{
+              backgroundColor: 'var(--button-primary-bg)',
+              color: 'var(--button-primary-text)'
+            }}
           >
             Complete Order
           </button>
@@ -510,13 +641,101 @@ export default function KioskPage() {
           <button
             onClick={() => setCart([])}
             disabled={cart.length === 0}
-            className="w-full py-2 rounded-lg bg-gray-200 text-gray-700 font-medium text-sm
-                       hover:bg-gray-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+            className="w-full py-2 rounded-lg font-medium text-sm
+                       hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+            style={{
+              backgroundColor: 'var(--button-secondary-bg)',
+              color: 'var(--button-secondary-text)'
+            }}
           >
             Clear Cart
           </button>
         </div>
       </div>
+
+      {/* Accessibility Modal */}
+      {accessibilityOpen && (
+        <div className="fixed inset-10 z-50 flex items-end justify-start">
+          <div className="rounded-2xl p-6 w-80 shadow-xl border-2" style={{
+            backgroundColor: 'var(--bg-primary)',
+            borderColor: 'var(--card-border)',
+            color: 'var(--text-primary)'
+          }}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold">Accessibility</h3>
+              <button
+                onClick={() => setAccessibilityOpen(false)}
+                className="text-2xl font-bold hover:opacity-70 cursor-pointer"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Text Size */}
+              <div>
+                <label className="block text-sm font-semibold mb-2">Text Size</label>
+                <div className="flex items-center gap-3">
+                  <span style={{ color: 'var(--text-muted)' }}>A</span>
+                  <input
+                    ref={textSizeInputRef}
+                    type="range"
+                    min="1"
+                    max="3"
+                    step="1"
+                    defaultValue={textSize === 'large' ? 2 : textSize === 'xlarge' ? 3 : 1}
+                    onMouseUp={() => {
+                      if (textSizeInputRef.current) {
+                        const val = parseInt(textSizeInputRef.current.value)
+                        setTextSize(val === 2 ? 'large' : val === 3 ? 'xlarge' : 'normal')
+                      }
+                    }}
+                    onTouchEnd={() => {
+                      if (textSizeInputRef.current) {
+                        const val = parseInt(textSizeInputRef.current.value)
+                        setTextSize(val === 2 ? 'large' : val === 3 ? 'xlarge' : 'normal')
+                      }
+                    }}
+                    className="flex-1"
+                  />
+                  <span className="text-xl" style={{ color: 'var(--text-muted)' }}>A</span>
+                </div>
+              </div>
+
+              {/* High Contrast Toggle */}
+              <div>
+                <label className="block text-sm font-semibold mb-2">High Contrast</label>
+                <button
+                  onClick={() => setHighContrast(!highContrast)}
+                  className={`w-full py-3 rounded-lg font-medium transition-colors cursor-pointer border-2`}
+                  style={{
+                    backgroundColor: highContrast ? 'var(--button-primary-bg)' : 'var(--button-secondary-bg)',
+                    color: highContrast ? 'var(--button-primary-text)' : 'var(--button-secondary-text)',
+                    borderColor: highContrast ? 'var(--button-primary-bg)' : 'var(--card-border)'
+                  }}
+                >
+                  {highContrast ? '✓ On' : 'Off'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Accessibility Button */}
+      <button
+        onClick={() => setAccessibilityOpen(!accessibilityOpen)}
+        className={`fixed bottom-6 left-6 z-40 w-14 h-14 rounded-full shadow-lg font-bold text-lg flex items-center justify-center transition-all hover:scale-110 cursor-pointer border-2`}
+        style={{
+          backgroundColor: 'var(--button-primary-bg)',
+          color: 'var(--button-primary-text)',
+          borderColor: 'var(--button-primary-bg)'
+        }}
+        title="Accessibility Options"
+        aria-label="Accessibility Options"
+      >
+        ♿
+      </button>
     </div>
   );
 }
