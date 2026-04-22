@@ -11,6 +11,47 @@ import QRLoginSection from '@/components/QRLoginSection'
 export default function KioskPage() {
   const { data: session } = useSession()
   const [showLoginModal, setShowLoginModal] = useState(false)
+
+  // Inject range slider styles
+  useEffect(() => {
+    const style = document.createElement('style')
+    style.innerHTML = `
+      input[type="range"] {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100%;
+        height: 6px;
+        border-radius: 3px;
+        background: var(--bg-secondary);
+        outline: none;
+        accent-color: var(--accent-color);
+      }
+      
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: var(--accent-color);
+        cursor: pointer;
+        margin-top: -6px;
+      }
+      
+      input[type="range"]::-moz-range-thumb {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: var(--accent-color);
+        cursor: pointer;
+        border: none;
+      }
+    `
+    document.head.appendChild(style)
+    return () => {
+      document.head.removeChild(style)
+    }
+  }, [])
   const [items, setItems] = useState<MenuItem[]>(MENU_ITEMS)
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [cart, setCart] = useState<OrderItem[]>([])
@@ -689,12 +730,19 @@ export default function KioskPage() {
 
       {/* Accessibility Modal */}
       {accessibilityOpen && (
-        <div className="fixed inset-10 z-50 flex items-end justify-start">
-          <div className="rounded-2xl p-6 w-80 shadow-xl border-2" style={{
-            backgroundColor: 'var(--bg-primary)',
-            borderColor: 'var(--card-border)',
-            color: 'var(--text-primary)'
-          }}>
+        <div 
+          className="fixed inset-0 z-50 flex items-end justify-start"
+          onClick={() => setAccessibilityOpen(false)}
+        >
+          <div 
+            className="rounded-2xl p-6 w-80 shadow-xl border-2 m-6" 
+            style={{
+              backgroundColor: 'var(--bg-primary)',
+              borderColor: 'var(--card-border)',
+              color: 'var(--text-primary)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold">Accessibility</h3>
               <button
