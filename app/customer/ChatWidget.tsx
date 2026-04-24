@@ -323,7 +323,7 @@ export default function ChatWidget({ menuItems, cart, weather, onAddToCart, onMo
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-[416px] z-40 w-16 h-16 rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 transition-colors cursor-pointer flex items-center justify-center text-3xl"
+        className="fixed bottom-6 right-[416px] z-40 w-16 h-16 rounded-full bg-[#500000] text-white shadow-lg hover:bg-[#651111] transition-colors cursor-pointer flex items-center justify-center text-3xl"
         aria-label="Open chat assistant"
       >
         💬
@@ -334,17 +334,17 @@ export default function ChatWidget({ menuItems, cart, weather, onAddToCart, onMo
   const latestButtons = messages.length > 0 ? messages[messages.length - 1].buttons ?? [] : []
 
   return (
-    <div className="fixed bottom-6 right-[416px] z-40 w-96 h-[540px] bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden">
-      <header className="px-4 py-3 bg-blue-600 text-white flex items-center justify-between gap-2">
+    <div className="fixed bottom-6 right-[416px] z-40 w-96 h-[540px] rounded-2xl shadow-2xl border flex flex-col overflow-hidden" style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--card-border)' }}>
+      <header className="px-4 py-3 bg-[#500000] text-white flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="font-bold">Personal Assistant</p>
-          <p className="text-xs text-blue-100">Ask me about drinks!</p>
+          <p className="font-bold" style={{ color: '#F8F4EF' }}>AggTea Assistant</p>
+          <p className="text-xs" style={{ color: 'rgba(248,244,239,0.8)' }}>Need help choosing a drink?</p>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
           <button
             onClick={resetConversation}
             disabled={messages.length <= 1}
-            className="px-2 h-8 rounded-full hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer flex items-center justify-center text-xs font-semibold"
+            className="px-2 h-8 rounded-full hover:bg-[#651111] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer flex items-center justify-center text-xs font-semibold"
             aria-label="Start over"
             title="Start over"
           >
@@ -352,7 +352,7 @@ export default function ChatWidget({ menuItems, cart, weather, onAddToCart, onMo
           </button>
           <button
             onClick={() => setIsOpen(false)}
-            className="w-8 h-8 rounded-full hover:bg-blue-700 transition-colors cursor-pointer flex items-center justify-center"
+            className="w-8 h-8 rounded-full hover:bg-[#651111] transition-colors cursor-pointer flex items-center justify-center"
             aria-label="Close chat"
           >
             ✕
@@ -360,7 +360,7 @@ export default function ChatWidget({ menuItems, cart, weather, onAddToCart, onMo
         </div>
       </header>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3 bg-gray-50">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3" style={{ backgroundColor: 'var(--bg-secondary)' }}>
         {messages.map((msg, idx) => (
           <div
             key={idx}
@@ -369,9 +369,10 @@ export default function ChatWidget({ menuItems, cart, weather, onAddToCart, onMo
             <div
               className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm ${
                 msg.role === 'user'
-                  ? 'bg-blue-600 text-white rounded-br-sm'
-                  : 'bg-white text-gray-800 border border-gray-200 rounded-bl-sm'
+                  ? 'bg-[#500000] text-white rounded-br-sm'
+                  : 'rounded-bl-sm border'
               }`}
+              style={msg.role !== 'user' ? { backgroundColor: 'var(--card-bg)', borderColor: 'var(--card-border)', color: 'var(--text-primary)' } : undefined}
             >
               {msg.content}
             </div>
@@ -379,7 +380,7 @@ export default function ChatWidget({ menuItems, cart, weather, onAddToCart, onMo
         ))}
         {isLoading && (
           <div className="flex justify-start">
-            <div className="bg-white text-gray-500 border border-gray-200 rounded-2xl rounded-bl-sm px-3 py-2 text-sm">
+            <div className="rounded-2xl rounded-bl-sm px-3 py-2 text-sm border" style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--card-border)', color: 'var(--text-muted)' }}>
               <span className="inline-block animate-pulse">● ● ●</span>
             </div>
           </div>
@@ -387,12 +388,13 @@ export default function ChatWidget({ menuItems, cart, weather, onAddToCart, onMo
       </div>
 
       {latestButtons.length > 0 && !isLoading && (
-        <div className="px-3 py-2 border-t border-gray-200 bg-white flex flex-wrap gap-2">
+        <div className="px-3 py-2 border-t flex flex-wrap gap-2" style={{ borderColor: 'var(--card-border)', backgroundColor: 'var(--card-bg)' }}>
           {latestButtons.map((btn, idx) => (
             <button
               key={idx}
               onClick={() => handleButtonClick(btn)}
-              className="px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold border border-blue-200 hover:bg-blue-100 transition-colors cursor-pointer"
+              className="px-3 py-1.5 rounded-full text-xs font-semibold border hover:opacity-80 transition-colors cursor-pointer"
+              style={{ backgroundColor: 'var(--bg-secondary)', color: '#500000', borderColor: '#500000' }}
             >
               {btn.label}
             </button>
@@ -401,9 +403,10 @@ export default function ChatWidget({ menuItems, cart, weather, onAddToCart, onMo
       )}
 
       {speechSupported && (
-        <div className="px-3 py-2 border-t border-gray-200 bg-white flex gap-2 items-center">
+        <div className="px-3 py-2 border-t flex gap-2 items-center" style={{ borderColor: 'var(--card-border)', backgroundColor: 'var(--card-bg)' }}>
           <div
-            className="flex-1 px-3 py-2 text-sm rounded-full border border-gray-300 bg-gray-50 text-gray-500 truncate select-none"
+            className="flex-1 px-3 py-2 text-sm rounded-full border truncate select-none"
+            style={{ borderColor: 'var(--input-border)', backgroundColor: 'var(--input-bg)', color: 'var(--text-muted)' }}
             aria-live="polite"
           >
             {isListening ? (inputText || 'Listening...') : 'Tap the mic to speak'}
