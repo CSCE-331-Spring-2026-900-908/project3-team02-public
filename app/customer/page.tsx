@@ -167,11 +167,12 @@ export default function KioskPage() {
   }, [])
 
   const categoryDescriptions: Record<string, string> = {
-    'Milk Tea': 'Creamy classics and house favorites',
-    'Fruit Tea': 'Fresh and fruity favorites',
-    'Slush': 'Frozen and sweet',
-    'Special': 'Signature AggTea picks',
-    'Snack': 'Something to pair with your drink',
+    'milk tea': 'Creamy classics and house favorites',
+    'fruit tea': 'Fresh and fruity favorites',
+    'refresher': 'Light, crisp, and easy to sip',
+    'slush': 'Frozen and sweet',
+    'specialty': 'Signature AggTea picks',
+    'snack': 'Something to pair with your drink',
   }
 
   const categories = Array.from(new Set(items.map(i => i.category))).filter(c => c && c.trim())
@@ -530,12 +531,15 @@ export default function KioskPage() {
                 <button
                   key={cat}
                   onClick={() => setSelectedCategory(cat)}
-                  className="rounded-2xl border-2 p-6 text-left transition-all cursor-pointer shadow-sm hover:shadow-md"
+                  className="rounded-2xl border-2 p-8 text-left transition-all duration-200 cursor-pointer hover:-translate-y-0.5"
                   style={{
                     backgroundColor: 'var(--card-bg)',
                     borderColor: 'var(--card-border)',
-                    color: 'var(--card-text)'
+                    color: 'var(--card-text)',
+                    boxShadow: '0 4px 16px rgba(46, 42, 40, 0.06)',
                   }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = '#500000'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(80, 0, 0, 0.12)' }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--card-border)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(46, 42, 40, 0.06)' }}
                 >
                   <p className="font-bold text-2xl leading-snug">{cat}</p>
                   {categoryDescriptions[cat] && (
@@ -547,7 +551,7 @@ export default function KioskPage() {
             </div>
           ) : visibleItems.length === 0 ? (
             <div className="flex items-center justify-center h-full">
-              <p className="text-gray-500 font-medium">No items available</p>
+              <p className="font-medium" style={{ color: 'var(--text-muted)' }}>No items available</p>
             </div>
           ) : (
             // Show items for selected category
@@ -556,12 +560,15 @@ export default function KioskPage() {
                 <button
                   key={item.itemid}
                   onClick={() => openCustomization(item)}
-                  className="rounded-2xl border-2 p-6 text-left transition-all cursor-pointer shadow-sm hover:shadow-md"
+                  className="rounded-2xl border-2 p-6 text-left transition-all duration-200 cursor-pointer hover:-translate-y-0.5"
                   style={{
                     backgroundColor: 'var(--card-bg)',
                     borderColor: 'var(--card-border)',
-                    color: 'var(--card-text)'
+                    color: 'var(--card-text)',
+                    boxShadow: '0 4px 16px rgba(46, 42, 40, 0.06)',
                   }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = '#500000'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(80, 0, 0, 0.12)' }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--card-border)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(46, 42, 40, 0.06)' }}
                 >
                   <p className="font-bold text-lg leading-snug">{item.itemname}</p>
                   {item.description && (
@@ -598,11 +605,12 @@ export default function KioskPage() {
             cart.map(item => (
               <div
                 key={item.cartId}
-                className="flex items-center justify-between rounded-xl border px-4 py-3 shadow-sm"
+                className="flex items-center justify-between rounded-xl border px-4 py-3"
                 style={{
-                  backgroundColor: 'var(--bg-primary)',
+                  backgroundColor: 'var(--card-bg)',
                   borderColor: 'var(--card-border)',
-                  color: 'var(--text-primary)'
+                  color: 'var(--text-primary)',
+                  boxShadow: '0 2px 8px rgba(46, 42, 40, 0.04)',
                 }}
               >
                 <div className="flex-1 min-w-0">
@@ -625,7 +633,7 @@ export default function KioskPage() {
                   >
                     −
                   </button>
-                  <span className="w-8 text-center font-semibold text-gray-800">{item.qty}</span>
+                  <span className="w-8 text-center font-semibold" style={{ color: 'var(--text-primary)' }}>{item.qty}</span>
                   <button
                     onClick={() => incrementCart(item.cartId)}
                     className="w-6 h-6 flex items-center justify-center rounded font-bold text-sm cursor-pointer transition-colors"
@@ -677,10 +685,11 @@ export default function KioskPage() {
             onClick={submitOrder}
             disabled={cart.length === 0}
             className="w-full py-4 rounded-xl font-bold text-lg
-                       hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer shadow-md"
+                       hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200 cursor-pointer"
             style={{
               backgroundColor: 'var(--button-primary-bg)',
-              color: 'var(--button-primary-text)'
+              color: 'var(--button-primary-text)',
+              boxShadow: cart.length > 0 ? '0 4px 14px rgba(80, 0, 0, 0.3)' : 'none',
             }}
           >
             Complete Order
