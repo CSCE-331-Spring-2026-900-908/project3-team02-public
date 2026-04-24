@@ -166,6 +166,14 @@ export default function KioskPage() {
     }
   }, [])
 
+  const categoryDescriptions: Record<string, string> = {
+    'Milk Tea': 'Creamy classics and house favorites',
+    'Fruit Tea': 'Fresh and fruity favorites',
+    'Slush': 'Frozen and sweet',
+    'Special': 'Signature AggTea picks',
+    'Snack': 'Something to pair with your drink',
+  }
+
   const categories = Array.from(new Set(items.map(i => i.category))).filter(c => c && c.trim())
   const visibleItems = selectedCategory ? items.filter(i => i.category === selectedCategory) : []
   const orderTotal = cart.reduce((sum, o) => sum + o.price * o.qty, 0)
@@ -465,7 +473,7 @@ export default function KioskPage() {
               </button>
             )}
             <h1 className="text-2xl font-bold truncate" style={{ color: 'var(--text-primary)' }}>
-              {selectedCategory ? selectedCategory : 'Order Kiosk'}
+              {selectedCategory ? selectedCategory : 'AggTea Kiosk'}
             </h1>
           </div>
           {!weatherLoading && weather && (
@@ -530,6 +538,9 @@ export default function KioskPage() {
                   }}
                 >
                   <p className="font-bold text-2xl leading-snug">{cat}</p>
+                  {categoryDescriptions[cat] && (
+                    <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>{categoryDescriptions[cat]}</p>
+                  )}
                   <p className="mt-3 text-sm" style={{ color: 'var(--text-muted)' }}>{items.filter(i => i.category === cat).length} items</p>
                 </button>
               ))}
@@ -573,13 +584,16 @@ export default function KioskPage() {
         <header className="px-6 py-4 border-b" style={{
           borderColor: 'var(--header-border)'
         }}>
-          <h2 className="font-bold text-lg" style={{ color: 'var(--text-primary)' }}>Your Order</h2>
+          <h2 className="font-bold text-lg" style={{ color: 'var(--text-primary)' }}>Your Cart</h2>
         </header>
 
         {/* Cart items */}
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
           {cart.length === 0 ? (
-            <p className="text-sm text-center mt-12 font-medium" style={{ color: 'var(--text-muted)' }}>No items selected</p>
+            <div className="text-center mt-12">
+              <p className="font-medium" style={{ color: 'var(--text-primary)' }}>Your cart is empty</p>
+              <p className="text-sm mt-2" style={{ color: 'var(--text-muted)' }}>Tap a drink to get started, or ask the assistant for help.</p>
+            </div>
           ) : (
             cart.map(item => (
               <div
