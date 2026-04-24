@@ -37,6 +37,8 @@ interface ChatWidgetProps {
   onModifyCartLine: (oldCartId: string, newCustomString: string) => string | null
   onSelectCategory: (category: string) => void
   onRequestClose?: () => void
+  textSize?: string
+  highContrast?: boolean
 }
 
 type LastAdded = {
@@ -52,7 +54,7 @@ function formatCustomization(c: Pick<LastAdded, 'size' | 'ice' | 'sugar' | 'boba
   return `${c.size}, ${c.ice}, ${c.sugar}, ${c.boba}`
 }
 
-export default function ChatWidget({ menuItems, cart, weather, onAddToCart, onModifyCartLine, onSelectCategory, onRequestClose }: ChatWidgetProps) {
+export default function ChatWidget({ menuItems, cart, weather, onAddToCart, onModifyCartLine, onSelectCategory, onRequestClose, textSize, highContrast }: ChatWidgetProps) {
   const [lastAdded, setLastAdded] = useState<LastAdded | null>(null)
   const [isListening, setIsListening] = useState(false)
   const [speechSupported, setSpeechSupported] = useState(false)
