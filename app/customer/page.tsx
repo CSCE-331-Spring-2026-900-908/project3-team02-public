@@ -66,28 +66,28 @@ export default function KioskPage() {
       root.style.setProperty('--input-text', '#ffffff')
       root.style.setProperty('--header-border', '#ffffff')
     } else {
-      root.style.setProperty('--bg-primary', '#ffffff')
-      root.style.setProperty('--bg-secondary', '#f3f4f6')
-      root.style.setProperty('--text-primary', '#000000')
-      root.style.setProperty('--text-secondary', '#666666')
-      root.style.setProperty('--text-muted', '#9ca3af')
-      root.style.setProperty('--border-color', '#d1d5db')
-      root.style.setProperty('--accent-color', '#2563eb')
-      root.style.setProperty('--button-primary-bg', '#2563eb')
+      root.style.setProperty('--bg-primary', '#F8F4EF')
+      root.style.setProperty('--bg-secondary', '#F3EEE8')
+      root.style.setProperty('--text-primary', '#2E2A28')
+      root.style.setProperty('--text-secondary', '#7A6F6B')
+      root.style.setProperty('--text-muted', '#9C8E85')
+      root.style.setProperty('--border-color', '#D9D0C8')
+      root.style.setProperty('--accent-color', '#500000')
+      root.style.setProperty('--button-primary-bg', '#500000')
       root.style.setProperty('--button-primary-text', '#ffffff')
-      root.style.setProperty('--button-secondary-bg', '#f3f4f6')
-      root.style.setProperty('--button-secondary-text', '#374151')
+      root.style.setProperty('--button-secondary-bg', '#F3EEE8')
+      root.style.setProperty('--button-secondary-text', '#2E2A28')
       root.style.setProperty('--button-danger-bg', '#fee2e2')
       root.style.setProperty('--button-danger-text', '#dc2626')
-      root.style.setProperty('--button-success-bg', '#dcfce7')
+      root.style.setProperty('--button-success-bg', '#E8F3EC')
       root.style.setProperty('--button-success-text', '#16a34a')
-      root.style.setProperty('--card-bg', '#f9fafb')
-      root.style.setProperty('--card-border', '#e5e7eb')
-      root.style.setProperty('--card-text', '#111827')
-      root.style.setProperty('--input-bg', '#f9fafb')
-      root.style.setProperty('--input-border', '#d1d5db')
-      root.style.setProperty('--input-text', '#000000')
-      root.style.setProperty('--header-border', '#e5e7eb')
+      root.style.setProperty('--card-bg', '#FFFDFC')
+      root.style.setProperty('--card-border', '#D9D0C8')
+      root.style.setProperty('--card-text', '#2E2A28')
+      root.style.setProperty('--input-bg', '#FFFDFC')
+      root.style.setProperty('--input-border', '#D9D0C8')
+      root.style.setProperty('--input-text', '#2E2A28')
+      root.style.setProperty('--header-border', '#D9D0C8')
     }
   }, [textSize, highContrast])
 
@@ -304,7 +304,7 @@ export default function KioskPage() {
         color: 'var(--text-primary)',
         fontSize: `calc(16px * var(--text-scale))`,
       }}
-      className="flex h-screen font-sans"
+      className="kiosk-theme flex h-screen font-sans"
     >
       <ChatWidget
         menuItems={items}
