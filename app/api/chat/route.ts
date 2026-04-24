@@ -79,6 +79,9 @@ You MUST respond with valid JSON in this exact format and nothing else:
     {"label": "Button text", "action": "modify_item", "update": {"sugar": "50% Sugar"}},
     {"label": "Button text", "action": "checkout"},
     {"label": "Button text", "action": "show_category", "category": "Milk Tea"}
+  ],
+  "cartActions": [
+    {"type": "add", "itemId": 1, "itemName": "Classic Milk Tea", "price": 5.50}
   ]
 }
 
@@ -111,10 +114,13 @@ If the customer is already decisive (e.g. "something fruity"), SKIP narrowing an
 - Use the [tags] on each menu item to match customer intent (creamy, fruity, refreshing, caffeine-free, first-timer, dessert-like, snack). Prefer ★BESTSELLER items when the customer asks for "popular", "best", or "first-timer".
 - When a customer mentions a restriction ("no caffeine", "low sugar", "not too sweet"), filter recommendations using the relevant tag or emit an initial modify_item button. Caffeine-free drinks are marked with the [caffeine-free] tag.
 
-## CART RULES
-- Adds to the cart happen ONLY when the customer clicks an add_item button. You cannot add drinks yourself.
-- NEVER claim to have added a drink in your message text unless the latest user message says "I just added X to my cart" (which is the confirmation that the button click succeeded).
-- The "CUSTOMER'S CURRENT CART" section is the AUTHORITATIVE current state and already reflects any add the user just confirmed. Do NOT add to those counts when the user's latest message says "I just added X" — that add is already in the cart summary. Read counts directly from the cart summary.
+## CART ACTION RULES
+- cartActions adds items to the cart. Only emit cartActions when the customer EXPLICITLY confirms they want a specific drink added (e.g. "yes add that", "please add those", "I'll take it").
+- Do NOT emit cartActions just because you recommended a drink — wait for explicit confirmation.
+- Each cart action: {"type": "add", "itemId": number, "itemName": string, "price": number}. Must match a real menu item.
+- Maximum 3 cartActions per response. If the customer asks for more (e.g. "15 mochi donuts"), add up to 3 and tell them to request more if needed.
+- When the latest user message says "I just added X to my cart", that add already happened via a button click — do NOT emit a cartAction for it again.
+- The "CUSTOMER'S CURRENT CART" section is the AUTHORITATIVE current state. Read counts directly from the cart summary. Do not invent counts.
 
 ## PERSONALITY
 - Concise, warm, a little playful. 1-2 sentences.
@@ -210,11 +216,12 @@ export async function POST(request: Request) {
 
     const cleaned = rawText.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '').trim()
 
-    const parsed = tryParseChatJson(cleaned)
+    const parsed = tryParseChatJson(cleaned) as any
     if (parsed) {
       return Response.json({
         message: parsed.message ?? "Sorry, I didn't catch that. Want to try again?",
         buttons: parsed.buttons ?? FALLBACK_BUTTONS,
+        cartActions: parsed.cartActions ?? [],
       })
     }
 
@@ -222,6 +229,7 @@ export async function POST(request: Request) {
     return Response.json({
       message: salvagedMessage ?? "Sorry, I'm having trouble responding right now. Try one of these?",
       buttons: FALLBACK_BUTTONS,
+      cartActions: [],
     })
   } catch (error) {
     console.error('Chat API error:', error)
@@ -229,6 +237,7 @@ export async function POST(request: Request) {
       {
         message: "Sorry, I'm having trouble right now. Please try again or browse the menu directly!",
         buttons: FALLBACK_BUTTONS,
+        cartActions: [],
       },
       { status: 500 }
     )

@@ -182,9 +182,9 @@ export default function ChatWidget({ menuItems, cart, weather, onAddToCart, onMo
 
   async function sendToApi(
     history: ChatMessage[],
-    options: { isGreeting?: boolean; cartOverride?: OrderItem[] } = {}
+    options: { isGreeting?: boolean; skipCartActions?: boolean; cartOverride?: OrderItem[] } = {}
   ) {
-    const { isGreeting = false, cartOverride } = options
+    const { isGreeting = false, skipCartActions = false, cartOverride } = options
     setIsLoading(true)
     try {
       const cartForSummary = cartOverride ?? cartRef.current
@@ -198,6 +198,26 @@ export default function ChatWidget({ menuItems, cart, weather, onAddToCart, onMo
         }),
       })
       const data = await response.json()
+
+      if (!skipCartActions && Array.isArray(data.cartActions)) {
+        const actions = data.cartActions.slice(0, 3)
+        for (const action of actions) {
+          if (action.type === 'add') {
+            const match = menuItems.find(i => i.itemid === action.itemId)
+            if (match) {
+              const newCartId = onAddToCart(match)
+              setLastAdded({
+                cartId: newCartId,
+                itemName: match.itemname,
+                size: 'Medium',
+                ice: 'Normal Ice',
+                sugar: '100% Sugar',
+                boba: 'Regular Boba',
+              })
+            }
+          }
+        }
+      }
 
       const assistantMessage: ChatMessage = {
         role: 'assistant',
@@ -260,7 +280,7 @@ export default function ChatWidget({ menuItems, cart, weather, onAddToCart, onMo
           cartId: `chat-${match.itemid}`,
         },
       ]
-      sendToApi(next, { cartOverride: projected })
+      sendToApi(next, { skipCartActions: true, cartOverride: projected })
     } else if (button.action === 'modify_item') {
       if (!lastAdded) return
       const updated = {
