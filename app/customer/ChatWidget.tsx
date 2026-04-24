@@ -17,13 +17,6 @@ type ChatButton =
   | { label: string; action: 'modify_item'; update: CustomizationUpdate }
   | { label: string; action: 'checkout' }
 
-type CartAction = {
-  type: 'add'
-  itemId: number
-  itemName: string
-  price: number
-}
-
 interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
@@ -207,7 +200,8 @@ export default function ChatWidget({ menuItems, cart, weather, onAddToCart, onMo
       const data = await response.json()
 
       if (!skipCartActions && Array.isArray(data.cartActions)) {
-        for (const action of data.cartActions as CartAction[]) {
+        const actions = data.cartActions.slice(0, 3)
+        for (const action of actions) {
           if (action.type === 'add') {
             const match = menuItems.find(i => i.itemid === action.itemId)
             if (match) {
@@ -308,7 +302,7 @@ export default function ChatWidget({ menuItems, cart, weather, onAddToCart, onMo
         { role: 'user', content: `${button.label} on my ${lastAdded.itemName}.` },
       ]
       setMessages(next)
-      sendToApi(next, { skipCartActions: true })
+      sendToApi(next)
     } else if (button.action === 'checkout') {
       setIsOpen(false)
       if (onRequestClose) onRequestClose()

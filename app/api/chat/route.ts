@@ -80,12 +80,14 @@ You MUST respond with valid JSON in this exact format and nothing else:
     {"label": "Button text", "action": "checkout"},
     {"label": "Button text", "action": "show_category", "category": "Milk Tea"}
   ],
-  "cartActions": []
+  "cartActions": [
+    {"type": "add", "itemId": 1, "itemName": "Classic Milk Tea", "price": 5.50}
+  ]
 }
 
 ## BUTTON ACTION TYPES
-- **add_item**: {itemId: number} — adds a drink with default customizations. Use for concrete drink recommendations.
-- **send_message**: {messageText: string} — simulates the customer saying something. Use for narrowing ("Creamy", "Refreshing", "Low sugar") and for follow-up paths.
+- **add_item**: {itemId: number} — adds a drink with default customizations. This is the ONLY way to add a drink to the cart. Every concrete drink recommendation MUST be an add_item button.
+- **send_message**: {messageText: string} — simulates the customer saying something. Use for narrowing ("Creamy", "Refreshing", "Low sugar") and for follow-up paths. NEVER use send_message for adding a drink — "Add X to cart" style send_message buttons are forbidden. Adds go through add_item only.
 - **modify_item**: {update: {size?, ice?, sugar?, boba?}} — modifies the customer's JUST-ADDED drink. Use ONLY right after an add. Allowed values:
   - size: "Medium" | "Large"
   - ice: "Normal Ice" | "Less Ice" | "No Ice"
@@ -113,10 +115,12 @@ If the customer is already decisive (e.g. "something fruity"), SKIP narrowing an
 - When a customer mentions a restriction ("no caffeine", "low sugar", "not too sweet"), filter recommendations using the relevant tag or emit an initial modify_item button. Caffeine-free drinks are marked with the [caffeine-free] tag.
 
 ## CART ACTION RULES
-- Only include cartActions when the customer explicitly confirms they want to add something.
-- Each cart action needs: type "add", itemId (number), itemName (string), price (number). Must match a real item.
-- Do NOT include cartActions just because you recommended a drink — wait for the customer to confirm.
-- The "CUSTOMER'S CURRENT CART" section is the AUTHORITATIVE current state and already reflects any add the user just confirmed. Do NOT add to those counts when the user's latest message says "I just added X" — that add is already in the cart summary. Read counts directly from the cart summary.
+- cartActions adds items to the cart. Only emit cartActions when the customer EXPLICITLY confirms they want a specific drink added (e.g. "yes add that", "please add those", "I'll take it").
+- Do NOT emit cartActions just because you recommended a drink — wait for explicit confirmation.
+- Each cart action: {"type": "add", "itemId": number, "itemName": string, "price": number}. Must match a real menu item.
+- Maximum 3 cartActions per response. If the customer asks for more (e.g. "15 mochi donuts"), add up to 3 and tell them to request more if needed.
+- When the latest user message says "I just added X to my cart", that add already happened via a button click — do NOT emit a cartAction for it again.
+- The "CUSTOMER'S CURRENT CART" section is the AUTHORITATIVE current state. Read counts directly from the cart summary. Do not invent counts.
 
 ## PERSONALITY
 - Concise, warm, a little playful. 1-2 sentences.
@@ -145,6 +149,31 @@ const FALLBACK_BUTTONS = [
   { label: 'Something creamy', action: 'send_message' as const, messageText: 'I want something creamy' },
   { label: 'Help me choose', action: 'send_message' as const, messageText: 'Help me pick a drink' },
 ]
+
+function tryParseChatJson(text: string): { message?: string; buttons?: unknown } | null {
+  try {
+    return JSON.parse(text)
+  } catch {
+    const start = text.indexOf('{')
+    const end = text.lastIndexOf('}')
+    if (start === -1 || end === -1 || end <= start) return null
+    try {
+      return JSON.parse(text.slice(start, end + 1))
+    } catch {
+      return null
+    }
+  }
+}
+
+function extractMessageField(text: string): string | null {
+  const match = text.match(/"message"\s*:\s*"((?:[^"\\]|\\.)*)"/)
+  if (!match) return null
+  try {
+    return JSON.parse(`"${match[1]}"`)
+  } catch {
+    return match[1]
+  }
+}
 
 function describeWeather(w?: WeatherContext): string {
   if (!w || typeof w.temperatureF !== 'number') return 'Unknown'
@@ -185,24 +214,23 @@ export async function POST(request: Request) {
     const textBlock = response.content.find(block => block.type === 'text')
     const rawText = textBlock?.text ?? ''
 
-    // Strip markdown code fences if present
     const cleaned = rawText.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '').trim()
 
-    try {
-      const parsed = JSON.parse(cleaned)
+    const parsed = tryParseChatJson(cleaned) as any
+    if (parsed) {
       return Response.json({
-        message: parsed.message ?? rawText,
+        message: parsed.message ?? "Sorry, I didn't catch that. Want to try again?",
         buttons: parsed.buttons ?? FALLBACK_BUTTONS,
         cartActions: parsed.cartActions ?? [],
       })
-    } catch {
-      // If JSON parsing fails, return the raw text with fallback buttons
-      return Response.json({
-        message: rawText,
-        buttons: FALLBACK_BUTTONS,
-        cartActions: [],
-      })
     }
+
+    const salvagedMessage = extractMessageField(cleaned)
+    return Response.json({
+      message: salvagedMessage ?? "Sorry, I'm having trouble responding right now. Try one of these?",
+      buttons: FALLBACK_BUTTONS,
+      cartActions: [],
+    })
   } catch (error) {
     console.error('Chat API error:', error)
     return Response.json(
