@@ -798,7 +798,7 @@ export default function KioskPage() {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm">
           <div className="bg-white rounded-2xl p-8 w-[360px] shadow-xl border border-gray-100">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-gray-900">Sign in with Google</h2>
+              <h2 className="text-lg font-bold text-gray-900">Sign in</h2>
               <button
                 onClick={() => setShowLoginModal(false)}
                 className="text-gray-400 hover:text-gray-600 transition-colors"
