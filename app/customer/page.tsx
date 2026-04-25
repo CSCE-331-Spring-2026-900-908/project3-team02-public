@@ -74,15 +74,17 @@ export default function KioskPage() {
   const [textSize, setTextSize] = useState('normal')
   const [highContrast, setHighContrast] = useState(false)
   const textSizeInputRef = useRef<HTMLInputElement>(null)
+  const kioskRef = useRef<HTMLDivElement>(null)
 
   // Apply accessibility settings via CSS variables
   useEffect(() => {
-    const root = document.documentElement
-    
-    // Text size multiplier
+    const root = kioskRef.current ?? document.documentElement
+
+    // --text-scale must live on <html> so `html { font-size: calc(16px * var(--text-scale)) }` picks it up
     const sizeMultiplier = textSize === 'large' ? 1.2 : textSize === 'xlarge' ? 1.5 : 1
+    document.documentElement.style.setProperty('--text-scale', sizeMultiplier.toString())
     root.style.setProperty('--text-scale', sizeMultiplier.toString())
-    
+
     if (highContrast) {
       root.style.setProperty('--bg-primary', '#000000')
       root.style.setProperty('--bg-secondary', '#1a1a1a')
@@ -348,7 +350,8 @@ export default function KioskPage() {
   }
 
   return (
-    <div 
+    <div
+      ref={kioskRef}
       style={{
         backgroundColor: 'var(--bg-primary)',
         color: 'var(--text-primary)',
@@ -753,12 +756,12 @@ export default function KioskPage() {
 
       {/* Accessibility Modal */}
       {accessibilityOpen && (
-        <div 
+        <div
           className="fixed inset-0 z-50 flex items-end justify-start"
           onClick={() => setAccessibilityOpen(false)}
         >
-          <div 
-            className="rounded-2xl p-6 w-80 shadow-xl border-2 m-6" 
+          <div
+            className="rounded-2xl p-6 w-80 shadow-xl border-2 m-6"
             style={{
               backgroundColor: 'var(--bg-primary)',
               borderColor: 'var(--card-border)',
