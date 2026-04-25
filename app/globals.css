@@ -47,6 +47,32 @@ body {
   color: var(--text-primary);
 }
 
+/* AggTea maroon theme — scoped to customer kiosk only */
+.kiosk-theme {
+  --bg-primary: #F8F4EF;
+  --bg-secondary: #F3EEE8;
+  --text-primary: #2E2A28;
+  --text-secondary: #7A6F6B;
+  --text-muted: #9C8E85;
+  --border-color: #D9D0C8;
+  --accent-color: #500000;
+  --button-primary-bg: #500000;
+  --button-primary-text: #ffffff;
+  --button-secondary-bg: #F3EEE8;
+  --button-secondary-text: #2E2A28;
+  --button-danger-bg: #fee2e2;
+  --button-danger-text: #dc2626;
+  --button-success-bg: #E8F3EC;
+  --button-success-text: #16a34a;
+  --card-bg: #FFFDFC;
+  --card-border: #D9D0C8;
+  --card-text: #2E2A28;
+  --input-bg: #FFFDFC;
+  --input-border: #D9D0C8;
+  --input-text: #2E2A28;
+  --header-border: #D9D0C8;
+}
+
 html {
   font-size: calc(16px * var(--text-scale));
 }

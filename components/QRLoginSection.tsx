@@ -175,7 +175,7 @@ export default function QRLoginSection({ redirectTo = "/manager/inventory", onSu
 
   return (
     <div className="flex flex-col items-center gap-3">
-      <p className="text-xs text-gray-500 text-center">Scan with your phone — no shared Wi-Fi needed</p>
+      <p className="text-xs text-gray-500 text-center">Scan with your phone to sign in</p>
 
       <div className="relative p-1 rounded-xl border-2 border-gray-200">
         <img src={qrDataUrl} alt="Google device auth QR code" width={200} height={200} className="block rounded-lg" />
