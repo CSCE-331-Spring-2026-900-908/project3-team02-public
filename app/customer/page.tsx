@@ -9,10 +9,11 @@ import ChatWidget from './ChatWidget'
 import QRLoginSection from '@/components/QRLoginSection'
 
 export default function KioskPage() {
+  
   const { data: session } = useSession()
   const [showLoginModal, setShowLoginModal] = useState(false)
 
-  // Inject range slider styles
+  // Inject range slider styles + Google Translate style
   useEffect(() => {
     const style = document.createElement('style')
     style.innerHTML = `
@@ -46,12 +47,52 @@ export default function KioskPage() {
         cursor: pointer;
         border: none;
       }
+      
+      /* Google Translate widget styling*/
+      body {
+        top: 0 !important;
+      }
+
+      .skiptranslate > iframe {
+        display: none !important;
+      }
+
+      #goog-gt-tt, .goog-te-balloon-frame {
+        display: none !important;
+      }
+
+      .goog-te-gadget {
+        color: transparent !important;
+        font-size: 0px !important;
+      }
+
+      .goog-logo-link, 
+      .goog-logo-link img, 
+      .goog-te-gadget span {
+        display: none !important;
+      }
+
+      .goog-te-gadget .goog-te-combo {
+        background-color: var(--bg-primary) !important;
+        color: var(--text-primary) !important;
+        border: 1px solid var(--accent-color) !important;
+        border-radius: 0.5rem !important;
+        padding: 0.375rem 0.5rem !important;
+        font-family: inherit !important;
+        font-size: 0.875rem !important;
+        font-weight: 500 !important;
+        outline: none !important;
+        cursor: pointer !important;
+        margin: 0 !important;
+        transition: border-color 0.2s ease;
+      }
     `
     document.head.appendChild(style)
     return () => {
       document.head.removeChild(style)
     }
   }, [])
+
   const [items, setItems] = useState<MenuItem[]>(MENU_ITEMS)
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [cart, setCart] = useState<OrderItem[]>([])
@@ -73,8 +114,64 @@ export default function KioskPage() {
   const [accessibilityOpen, setAccessibilityOpen] = useState(false)
   const [textSize, setTextSize] = useState('normal')
   const [highContrast, setHighContrast] = useState(false)
+  const [screenReaderEnabled, setScreenReaderEnabled] = useState(false)
   const textSizeInputRef = useRef<HTMLInputElement>(null)
   const kioskRef = useRef<HTMLDivElement>(null)
+
+  // Screen Reader Logic (Tap to Read, Double-Tap to Activate)
+  useEffect(() => {
+    if (!screenReaderEnabled) {
+      window.speechSynthesis?.cancel()
+      return
+    }
+
+    let lastClickTarget: EventTarget | null = null
+    let lastClickTime = 0
+
+    const handleInteraction = (e: MouseEvent | TouchEvent) => {
+      const now = Date.now()
+      const isDoubleTap = e.target === lastClickTarget && (now - lastClickTime) < 400
+
+      if (!isDoubleTap) {
+        // Single tap: Read it, block the actual click action
+        e.preventDefault()
+        e.stopPropagation()
+        
+        const target = e.target as HTMLElement
+        // Try to find the closest interactive element to read its full context
+        const interactiveEl = target.closest('button, a, select, input, [role="button"]')
+        const elementToRead = interactiveEl || target
+        
+        const textToRead = 
+          elementToRead.getAttribute('aria-label') || 
+          elementToRead.getAttribute('title') || 
+          (elementToRead as HTMLElement).innerText || 
+          elementToRead.textContent
+
+        if (textToRead && textToRead.trim()) {
+          window.speechSynthesis?.cancel()
+          const utterance = new SpeechSynthesisUtterance(textToRead.trim())
+          // Optional: Adjust speech rate or voice here
+          utterance.rate = 1.0 
+          window.speechSynthesis?.speak(utterance)
+        }
+
+        lastClickTarget = e.target
+        lastClickTime = now
+      } else {
+        // Double tap: let the click through, reset state
+        lastClickTarget = null
+      }
+    }
+
+    // Use capture phase to intercept the click before React processes it
+    document.addEventListener('click', handleInteraction, true)
+
+    return () => {
+      document.removeEventListener('click', handleInteraction, true)
+      window.speechSynthesis?.cancel()
+    }
+  }, [screenReaderEnabled])
 
   // Apply accessibility settings via CSS variables
   useEffect(() => {
@@ -181,7 +278,7 @@ export default function KioskPage() {
     ;(window as any).googleTranslateElementInit = function () {
       if ((window as any).google?.translate?.TranslateElement) {
         new (window as any).google.translate.TranslateElement(
-          { pageLanguage: 'en', layout: (window as any).google.translate.TranslateElement.InlineLayout.SIMPLE }, 
+          { pageLanguage: 'en'}, 
           'google_translate_element'
         )
       }
@@ -823,6 +920,27 @@ export default function KioskPage() {
                   }}
                 >
                   {highContrast ? '✓ On' : 'Off'}
+                </button>
+              </div>
+
+              {/* Screen Reader Toggle */}
+              <div>
+                <label className="block text-sm font-semibold mb-2">
+                  Screen Reader
+                  <span className="block text-xs font-normal mt-1 opacity-80">
+                    (Tap once to read, double-tap to select)
+                  </span>
+                </label>
+                <button
+                  onClick={() => setScreenReaderEnabled(!screenReaderEnabled)}
+                  className={`w-full py-3 rounded-lg font-medium transition-colors cursor-pointer border-2`}
+                  style={{
+                    backgroundColor: screenReaderEnabled ? 'var(--button-primary-bg)' : 'var(--button-secondary-bg)',
+                    color: screenReaderEnabled ? 'var(--button-primary-text)' : 'var(--button-secondary-text)',
+                    borderColor: screenReaderEnabled ? 'var(--button-primary-bg)' : 'var(--card-border)'
+                  }}
+                >
+                  {screenReaderEnabled ? '✓ On' : 'Off'}
                 </button>
               </div>
             </div>
