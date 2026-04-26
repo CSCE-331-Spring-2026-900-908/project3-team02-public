@@ -247,6 +247,7 @@ export default function KioskPage() {
             price: Number(r.price),
             category: r.category,
             description: r.description ?? '',
+            image: r.image ?? null,
           }))
         setItems(normalized)
       } catch (error) {
@@ -701,7 +702,8 @@ export default function KioskPage() {
                 <button
                   key={item.itemid}
                   onClick={() => openCustomization(item)}
-                  className="rounded-2xl border-2 p-6 text-left transition-all duration-200 cursor-pointer hover:-translate-y-0.5"
+                  // ADDED: flex flex-col to stack the image, text, and price
+                  className="rounded-2xl border-2 p-6 text-left transition-all duration-200 cursor-pointer hover:-translate-y-0.5 flex flex-col"
                   style={{
                     backgroundColor: 'var(--card-bg)',
                     borderColor: 'var(--card-border)',
@@ -710,12 +712,29 @@ export default function KioskPage() {
                   }}
                   onMouseEnter={e => { e.currentTarget.style.borderColor = '#500000'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(80, 0, 0, 0.12)' }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--card-border)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(46, 42, 40, 0.06)' }}
-                >
+                >                
+                  {item.image ? (
+                    <div className="w-full h-32 mb-4 rounded-xl overflow-hidden bg-black/5 flex-shrink-0">
+                      <img
+                        src={item.image}
+                        alt={item.itemname}
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-full h-32 mb-4 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+                      <span className="text-4xl opacity-50">🧋</span>
+                    </div>
+                  )}
+                 
                   <p className="font-bold text-lg leading-snug">{item.itemname}</p>
+                  
                   {item.description && (
                     <p className="mt-2 text-sm line-clamp-2" style={{ color: 'var(--text-muted)' }}>{item.description}</p>
                   )}
-                  <p className="mt-3 font-bold text-xl" style={{ color: 'var(--accent-color)' }}>${item.price.toFixed(2)}</p>
+                  
+                  {/* ADDED: mt-auto to push the price to the bottom if descriptions vary in length */}
+                  <p className="mt-auto pt-4 font-bold text-xl" style={{ color: 'var(--accent-color)' }}>${item.price.toFixed(2)}</p>
                 </button>
               ))}
             </div>
