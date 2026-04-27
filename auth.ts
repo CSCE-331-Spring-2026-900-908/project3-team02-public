@@ -1,16 +1,31 @@
 import NextAuth from "next-auth"
 import Google from "next-auth/providers/google"
-import GitHub from "next-auth/providers/github"
+import Credentials from "next-auth/providers/credentials"
+import { consumeQRSession } from "@/lib/qr-sessions"
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
     Google({
-      clientId: process.env.AUTH_GOOGLE_ID,
-      clientSecret: process.env.AUTH_GOOGLE_SECRET,
+      clientId: process.env.AUTH_GOOGLE_ID_BUTTON,
+      clientSecret: process.env.AUTH_GOOGLE_SECRET_BUTTON,
     }),
-    GitHub({
-      clientId: process.env.AUTH_GITHUB_ID,
-      clientSecret: process.env.AUTH_GITHUB_SECRET,
+    Credentials({
+      id: "qr-code",
+      credentials: {
+        sessionId: { type: "text" },
+      },
+      async authorize(credentials) {
+        const sessionId = credentials?.sessionId as string | undefined
+        if (!sessionId) return null
+        const user = consumeQRSession(sessionId)
+        if (!user) return null
+        return {
+          id: user.email ?? user.name ?? "user",
+          name: user.name,
+          email: user.email,
+          image: user.image,
+        }
+      },
     }),
   ],
   pages: {

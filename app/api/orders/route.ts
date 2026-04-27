@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { pool } from '@/lib/db'
+import { addToQueue } from '@/lib/queue'
 
 type IncomingOrderItem = {
   itemId: number
@@ -82,7 +83,29 @@ export async function POST(req: Request) {
     )
 
     await client.query('COMMIT')
-    return NextResponse.json({ saleId, subtotal, tax, total }, { status: 201 })
+
+    // Fetch item categories for queue time calculation
+    const itemIds = items.map(i => i.itemId)
+    const catResult = await client.query<{ itemid: number; category: string }>(
+      `SELECT itemid, category FROM items WHERE itemid = ANY($1)`,
+      [itemIds]
+    )
+    const categoryMap = new Map(catResult.rows.map(r => [r.itemid, r.category]))
+
+    const queueEntry = addToQueue(
+      saleId,
+      items.map(i => ({
+        itemName: i.itemName,
+        qty: i.qty,
+        category: categoryMap.get(i.itemId) ?? 'Milk Tea',
+        customizations: i.customizations,
+      }))
+    )
+
+    return NextResponse.json(
+      { saleId, subtotal, tax, total, queueMinutes: queueEntry.minutesTotal },
+      { status: 201 }
+    )
   } catch (error) {
     await client.query('ROLLBACK')
     console.error('Checkout error:', error) // Keep it in the server logs
