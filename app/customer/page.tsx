@@ -104,7 +104,7 @@ export default function KioskPage() {
   const [customizingItem, setCustomizingItem] = useState<MenuItem | null>(null)
   const [drinkSize, setDrinkSize] = useState('Medium')
   const [iceLevel, setIceLevel] = useState('Normal Ice')
-  const [sugarLevel, setSugarLevel] = useState('100% Sugar')
+  const [sugarLevel, setSugarLevel] = useState('120% Sugar')
   const [bobaOption, setBobaOption] = useState('')
 
   // Add these with your other state declarations
@@ -604,6 +604,7 @@ export default function KioskPage() {
                     color: 'var(--input-text)'
                   }}
                 >
+                  <option>120% Sugar</option>
                   <option>100% Sugar</option>
                   <option>75% Sugar</option>
                   <option>50% Sugar</option>
@@ -612,32 +613,34 @@ export default function KioskPage() {
                 </select>
               </div>
 
-              <div>
-                <label className="block text-sm font-semibold mb-2">Boba</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { value: 'Regular Boba' as const, emoji: '🧋', label: 'Regular' },
-                    { value: 'Extra Boba' as const, emoji: '🧋+', label: 'Extra' },
-                    { value: 'No Boba' as const, emoji: '🚫🧋', label: 'None' },
-                  ].map(option => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      aria-pressed={bobaOption === option.value}
-                      onClick={() => setBobaOption(option.value)}
-                      className="rounded-lg border p-3 flex flex-col items-center justify-center transition-colors"
-                      style={{
-                        borderColor: bobaOption === option.value ? 'var(--accent-color)' : 'var(--card-border)',
-                        backgroundColor: bobaOption === option.value ? 'var(--accent-color)' : 'var(--card-bg)',
-                        color: bobaOption === option.value ? '#ffffff' : 'var(--card-text)'
-                      }}
-                    >
-                      <span className="text-xl">{option.emoji}</span>
-                      <span className="text-xs mt-1 font-medium">{option.label}</span>
-                    </button>
-                  ))}
+              {['milk tea', 'fruit tea', 'specialty'].includes((customizingItem?.category || '').toLowerCase()) && (
+                <div>
+                  <label className="block text-sm font-semibold mb-2">Boba</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { value: 'Regular Boba' as const, emoji: '🧋', label: 'Regular' },
+                      { value: 'Extra Boba' as const, emoji: '🧋+', label: 'Extra' },
+                      { value: 'No Boba' as const, emoji: '🚫🧋', label: 'None' },
+                    ].map(option => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        aria-pressed={bobaOption === option.value}
+                        onClick={() => setBobaOption(option.value)}
+                        className="rounded-lg border p-3 flex flex-col items-center justify-center transition-colors"
+                        style={{
+                          borderColor: bobaOption === option.value ? 'var(--accent-color)' : 'var(--card-border)',
+                          backgroundColor: bobaOption === option.value ? 'var(--accent-color)' : 'var(--card-bg)',
+                          color: bobaOption === option.value ? '#ffffff' : 'var(--card-text)'
+                        }}
+                      >
+                        <span className="text-xl">{option.emoji}</span>
+                        <span className="text-xs mt-1 font-medium">{option.label}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             <div className="mt-8 flex gap-3">

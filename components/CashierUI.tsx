@@ -222,20 +222,28 @@ export default function CashierUI() {
               <div className="flex items-center gap-4">
                 <span className="font-medium text-gray-500 text-base w-14 uppercase tracking-wider">Sugar</span>
                 <div className="flex gap-2 flex-1">
-                  {['100% Sugar', '75% Sugar', '50% Sugar', '25% Sugar', '0% Sugar'].map(opt => (
-                    <button key={opt} onClick={() => setSugarLevel(opt)} className={`flex-1 py-2.5 px-1 border rounded font-medium text-sm transition-colors ${sugarLevel === opt ? 'bg-gray-900 border-gray-900 text-white' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}>{opt.replace(' Sugar', '')}</button>
+                  {['120% Sugar', '100% Sugar', '75% Sugar', '50% Sugar', '25% Sugar', '0% Sugar'].map(opt => (
+                    <button 
+                      key={opt} 
+                      onClick={() => setSugarLevel(opt)} 
+                      className={`flex-1 py-2.5 px-1 border rounded font-medium text-sm transition-colors ${sugarLevel === opt ? 'bg-gray-900 border-gray-900 text-white' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+                    >
+                      {opt.replace(' Sugar', '')}
+                    </button>
                   ))}
                 </div>
               </div>
 
-              <div className="flex items-center gap-4">
-                <span className="font-medium text-gray-500 text-base w-14 uppercase tracking-wider">Boba</span>
-                <div className="flex gap-2 flex-1">
-                  {['Regular Boba', 'Extra Boba', 'No Boba'].map(opt => (
-                    <button key={opt} onClick={() => setBobaOption(opt)} className={`flex-1 py-2.5 px-2 border rounded font-medium text-base transition-colors ${bobaOption === opt ? 'bg-gray-900 border-gray-900 text-white' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}>{opt}</button>
-                  ))}
+              {['milk tea', 'fruit tea', 'specialty'].includes((customizingItem?.category || '').toLowerCase()) && (
+                <div className="flex items-center gap-4">
+                  <span className="font-medium text-gray-500 text-base w-14 uppercase tracking-wider">Boba</span>
+                  <div className="flex gap-2 flex-1">
+                    {['Regular Boba', 'Extra Boba', 'No Boba'].map(opt => (
+                      <button key={opt} onClick={() => setBobaOption(opt)} className={`flex-1 py-2.5 px-2 border rounded font-medium text-base transition-colors ${bobaOption === opt ? 'bg-gray-900 border-gray-900 text-white' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}>{opt}</button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             <div className="flex gap-3 mt-4">
