@@ -18,7 +18,7 @@ export default function KioskPage() {
   const [drinkSize, setDrinkSize] = useState('Medium')
   const [iceLevel, setIceLevel] = useState('Normal Ice')
   const [sugarLevel, setSugarLevel] = useState('100% Sugar')
-  const [bobaOption, setBobaOption] = useState<'Regular Boba' | 'Extra Boba' | 'No Boba'>('Regular Boba')
+  const [bobaOption, setBobaOption] = useState('')
 
   // Add these with your other state declarations
   const [weather, setWeather] = useState<any>(null)
@@ -104,17 +104,44 @@ export default function KioskPage() {
   const orderTotal = cart.reduce((sum, o) => sum + o.price * o.qty, 0)
 
   function openCustomization(item: MenuItem) {
+    if (item.category.toLowerCase().includes('snack')) {
+      const cartId = `${item.itemid}-no-customization`
+      
+      setCart(prev => {
+        const existing = prev.find(o => o.cartId === cartId)
+        if (existing) {
+          return prev.map(o =>
+            o.cartId === cartId ? { ...o, qty: o.qty + 1 } : o
+          )
+        }
+        return [...prev, { 
+          itemId: item.itemid, 
+          itemName: item.itemname, 
+          price: item.price, 
+          qty: 1,
+          cartId
+        }]
+      })
+
+      setAddedNotification(item.itemname)
+      setTimeout(() => setAddedNotification(null), 2000)
+      return
+    }
+
     setCustomizingItem(item)
     setDrinkSize('Medium')
     setIceLevel('Normal Ice')
     setSugarLevel('100% Sugar')
-    setBobaOption('Regular Boba')
+    setBobaOption('')
   }
 
   function confirmCustomization() {
     if (!customizingItem) return
     
-    const customString = `${drinkSize}, ${iceLevel}, ${sugarLevel}, ${bobaOption}`
+    const customParts = [drinkSize, iceLevel, sugarLevel]
+    if (bobaOption) customParts.push(bobaOption)
+    const customString = customParts.join(', ')
+    
     const cartId = `${customizingItem.itemid}-${customString}`
 
     setCart(prev => {
@@ -268,6 +295,7 @@ export default function KioskPage() {
                   className="w-full text-black p-3 rounded-lg border border-gray-300 bg-gray-50 focus:ring-2 focus:ring-blue-500"
                 >
                   <option>Normal Ice</option>
+                  <option>Extra Ice</option>
                   <option>Less Ice</option>
                   <option>No Ice</option>
                 </select>
@@ -280,6 +308,7 @@ export default function KioskPage() {
                   onChange={(e) => setSugarLevel(e.target.value)}
                   className="w-full text-black p-3 rounded-lg border border-gray-300 bg-gray-50 focus:ring-2 focus:ring-blue-500"
                 >
+                  <option>120% Sugar</option>
                   <option>100% Sugar</option>
                   <option>75% Sugar</option>
                   <option>50% Sugar</option>
@@ -290,48 +319,54 @@ export default function KioskPage() {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Boba</label>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    aria-pressed={bobaOption === 'Regular Boba'}
-                    onClick={() => setBobaOption('Regular Boba')}
-                    className={`rounded-lg border p-3 flex flex-col items-center justify-center transition-colors ${
-                      bobaOption === 'Regular Boba'
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    <span className="text-xl">🧋</span>
-                    <span className="text-xs mt-1 font-medium">Regular</span>
-                  </button>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="relative">
+                    <button
+                      type="button"
+                      aria-pressed={bobaOption === 'Regular Boba'}
+                      onClick={() => setBobaOption(bobaOption === 'Regular Boba' ? '' : 'Regular Boba')}
+                      className={`w-full rounded-lg border p-3 flex flex-col items-center justify-center transition-colors ${
+                        bobaOption === 'Regular Boba'
+                          ? 'border-blue-500 bg-blue-50 text-blue-700 opacity-100'
+                          : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50 opacity-60 hover:opacity-100'
+                      }`}
+                    >
+                      <span className="text-xl">🧋</span>
+                      <span className="text-xs mt-1 font-medium">Regular</span>
+                    </button>
+                    {bobaOption === 'Regular Boba' && (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setBobaOption(''); }}
+                        className="absolute -top-2 -right-2 w-6 h-6 bg-white border border-gray-200 text-gray-500 rounded-full flex items-center justify-center text-sm font-bold shadow-sm hover:text-red-500 hover:border-red-200 transition-colors z-10"
+                      >
+                        &times;
+                      </button>
+                    )}
+                  </div>
 
-                  <button
-                    type="button"
-                    aria-pressed={bobaOption === 'Extra Boba'}
-                    onClick={() => setBobaOption('Extra Boba')}
-                    className={`rounded-lg border p-3 flex flex-col items-center justify-center transition-colors ${
-                      bobaOption === 'Extra Boba'
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    <span className="text-xl">🧋+</span>
-                    <span className="text-xs mt-1 font-medium">Extra</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    aria-pressed={bobaOption === 'No Boba'}
-                    onClick={() => setBobaOption('No Boba')}
-                    className={`rounded-lg border p-3 flex flex-col items-center justify-center transition-colors ${
-                      bobaOption === 'No Boba'
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    <span className="text-xl">🚫🧋</span>
-                    <span className="text-xs mt-1 font-medium">None</span>
-                  </button>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      aria-pressed={bobaOption === 'Extra Boba'}
+                      onClick={() => setBobaOption(bobaOption === 'Extra Boba' ? '' : 'Extra Boba')}
+                      className={`w-full rounded-lg border p-3 flex flex-col items-center justify-center transition-colors ${
+                        bobaOption === 'Extra Boba'
+                          ? 'border-blue-500 bg-blue-50 text-blue-700 opacity-100'
+                          : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50 opacity-60 hover:opacity-100'
+                      }`}
+                    >
+                      <span className="text-xl">🧋+</span>
+                      <span className="text-xs mt-1 font-medium">Extra</span>
+                    </button>
+                    {bobaOption === 'Extra Boba' && (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setBobaOption(''); }}
+                        className="absolute -top-2 -right-2 w-6 h-6 bg-white border border-gray-200 text-gray-500 rounded-full flex items-center justify-center text-sm font-bold shadow-sm hover:text-red-500 hover:border-red-200 transition-colors z-10"
+                      >
+                        &times;
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
