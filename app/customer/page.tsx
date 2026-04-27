@@ -97,6 +97,7 @@ export default function KioskPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [cart, setCart] = useState<OrderItem[]>([])
   const [submitted, setSubmitted] = useState(false)
+  const [orderResult, setOrderResult] = useState<{ saleId: number; total: number; queueMinutes: number } | null>(null)
   const [addedNotification, setAddedNotification] = useState<string | null>(null)
 
   // Customization states
@@ -437,10 +438,17 @@ export default function KioskPage() {
       }
 
       const data = await response.json()
-      alert(`Order submitted! Sale ID: ${data.saleId}\nTotal: $${Number(data.total).toFixed(2)}`)
       setCart([])
+      setOrderResult({
+        saleId: data.saleId,
+        total: Number(data.total),
+        queueMinutes: data.queueMinutes ?? 0,
+      })
       setSubmitted(true)
-      setTimeout(() => setSubmitted(false), 3000)
+      setTimeout(() => {
+        setSubmitted(false)
+        setOrderResult(null)
+      }, 8000)
     } catch (error) {
       console.error('Order Error:', error)
       alert('Could not submit order. Please check the network connectivity and try again.')
@@ -467,6 +475,48 @@ export default function KioskPage() {
         textSize={textSize}
         highContrast={highContrast}
       />
+
+      {/* Order Success Overlay */}
+      {submitted && orderResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div
+            className="rounded-3xl p-10 w-[420px] max-w-[90vw] shadow-2xl border-2 flex flex-col items-center gap-6 text-center"
+            style={{
+              backgroundColor: 'var(--bg-primary)',
+              borderColor: 'var(--button-success-text)',
+              color: 'var(--text-primary)',
+            }}
+          >
+            <div className="text-6xl">✓</div>
+            <h2 className="text-3xl font-bold" style={{ color: 'var(--button-success-text)' }}>
+              Order Placed!
+            </h2>
+            <p className="text-lg" style={{ color: 'var(--text-secondary)' }}>
+              Total: <strong>${orderResult.total.toFixed(2)}</strong>
+            </p>
+            {orderResult.queueMinutes > 0 && (
+              <div
+                className="rounded-2xl px-8 py-5 border-2"
+                style={{
+                  backgroundColor: 'var(--bg-secondary)',
+                  borderColor: 'var(--accent-color)',
+                }}
+              >
+                <p className="text-sm font-semibold uppercase tracking-widest mb-1" style={{ color: 'var(--text-muted)' }}>
+                  Estimated Wait
+                </p>
+                <p className="text-5xl font-bold" style={{ color: 'var(--accent-color)' }}>
+                  ~{orderResult.queueMinutes} min
+                </p>
+              </div>
+            )}
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+              This screen will close automatically
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Customization Modal */}
       {customizingItem && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm">
@@ -820,7 +870,7 @@ export default function KioskPage() {
               borderColor: 'var(--button-success-text)',
               color: 'var(--button-success-text)'
             }}>
-              Order placed successfully!
+              Order placed!{orderResult?.queueMinutes ? ` Ready in ~${orderResult.queueMinutes} min` : ''}
             </div>
           )}
 

@@ -9,9 +9,18 @@ interface MenuItem {
   category: string;
 }
 
+interface QueueEntry {
+  id: string;
+  saleId: number;
+  summary: string;
+  minutesTotal: number;
+  minutesRemaining: number;
+}
+
 const WindowBoundMenuBoard = () => {
   const [items, setItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [queue, setQueue] = useState<QueueEntry[]>([]);
 
   useEffect(() => {
     const fetchItems = async () => {
@@ -26,6 +35,21 @@ const WindowBoundMenuBoard = () => {
       }
     };
     fetchItems();
+  }, []);
+
+  useEffect(() => {
+    const fetchQueue = async () => {
+      try {
+        const res = await fetch('/api/queue');
+        const data = await res.json();
+        if (Array.isArray(data)) setQueue(data);
+      } catch {
+        // silently ignore queue fetch errors on the board
+      }
+    };
+    fetchQueue();
+    const interval = setInterval(fetchQueue, 15000);
+    return () => clearInterval(interval);
   }, []);
 
   const getByCategory = (catName: string) => {
@@ -44,7 +68,7 @@ const WindowBoundMenuBoard = () => {
   );
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-white overflow-hidden font-sans select-none border-gray-200">
+    <div className="h-screen w-screen flex flex-col bg-white overflow-hidden font-sans select-none border-gray-200 relative">
       
       {/* 1. TOP IMAGE BANNER (25% height) */}
       <div className="grid grid-cols-3 h-[25vh] shrink-0">
@@ -148,6 +172,28 @@ const WindowBoundMenuBoard = () => {
         </section>
 
       </div>
+
+      {/* Live Queue Strip */}
+      {queue.length > 0 && (
+        <div className="absolute bottom-0 left-0 right-0 z-20 bg-black/85 text-white flex items-center overflow-hidden" style={{ height: '7vh' }}>
+          <div className="shrink-0 bg-amber-500 h-full flex items-center px-[2vw]">
+            <span className="font-black uppercase tracking-widest text-black text-[2vh] whitespace-nowrap">
+              ORDER QUEUE
+            </span>
+          </div>
+          <div className="flex items-center gap-[4vw] px-[2vw] overflow-x-auto flex-1 h-full">
+            {queue.map((entry, i) => (
+              <div key={entry.id} className="flex items-center gap-[1vw] shrink-0">
+                <span className="text-amber-400 font-bold text-[2.2vh]">#{i + 1}</span>
+                <span className="text-[1.8vh] text-gray-200">{entry.summary}</span>
+                <span className="text-[1.8vh] font-bold text-white bg-white/20 rounded px-2 py-0.5 whitespace-nowrap">
+                  ~{entry.minutesRemaining} min
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

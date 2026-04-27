@@ -25,6 +25,7 @@ export default function CashierUI() {
   const [cart, setCart] = useState<OrderItem[]>([])
   const [paymentType, setPaymentType] = useState<'Card' | 'Cash'>('Card')
   const [submitted, setSubmitted] = useState(false)
+  const [queueMinutes, setQueueMinutes] = useState<number | null>(null)
 
   // Customization states
   const [customizingItem, setCustomizingItem] = useState<MenuItem | null>(null)
@@ -179,10 +180,12 @@ export default function CashierUI() {
         throw new Error('Failed to complete order.')
       }
 
+      const data = await res.json()
       setCart([])
       setPaymentType('Card')
+      setQueueMinutes(data.queueMinutes ?? null)
       setSubmitted(true)
-      setTimeout(() => setSubmitted(false), 3000)
+      setTimeout(() => setSubmitted(false), 5000)
     } catch (error) {
       console.error(error)
       alert('There was an error submitting the order. Please try again.')
@@ -335,7 +338,7 @@ export default function CashierUI() {
         <div className="px-4 py-3 border-t border-gray-200 bg-white space-y-3">
           {submitted && (
             <div className="rounded-lg bg-green-100 border border-green-300 text-green-800 text-sm px-3 py-2 text-center font-medium">
-              Order placed successfully!
+              Order placed!{queueMinutes != null ? ` Ready in ~${queueMinutes} min` : ''}
             </div>
           )}
 
