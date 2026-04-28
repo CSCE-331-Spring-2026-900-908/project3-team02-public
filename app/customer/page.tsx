@@ -317,7 +317,9 @@ export default function KioskPage() {
 
   const categories = Array.from(new Set(items.map(i => i.category))).filter(c => c && c.trim())
   const visibleItems = selectedCategory ? items.filter(i => i.category === selectedCategory) : []
-  const orderTotal = cart.reduce((sum, o) => sum + o.price * o.qty, 0)
+  const cartSubtotal = cart.reduce((sum, o) => sum + o.price * o.qty, 0)
+  const cartTax = cartSubtotal * 0.0825
+  const orderTotal = cartSubtotal + cartTax
 
   function openCustomization(item: MenuItem) {
     setCustomizingItem(item)
@@ -442,7 +444,7 @@ export default function KioskPage() {
       setTimeout(() => setSubmitted(false), 3000)
     } catch (error) {
       console.error('Order Error:', error)
-      alert('Could not submit order. Please check the network connectivity and try again.')
+      alert('Could not submit order. Please check your network connectivity and try again.')
     }
   }
 
@@ -812,10 +814,15 @@ export default function KioskPage() {
           }}>
             <div className="flex justify-between items-center">
               <span className="font-medium" style={{ color: 'var(--text-secondary)' }}>Subtotal</span>
-              <span>${orderTotal.toFixed(2)}</span>
+              <span>${cartSubtotal.toFixed(2)}</span>
             </div>
+            <div className="flex justify-between items-center">
+              <span className="font-light" style={{ color: 'var(--text-muted)' }}>Tax (8.25%)</span>
+              <span className="font-light" >${cartTax.toFixed(2)}</span>
+            </div>
+
             <div className="border-t mt-3 pt-3 flex justify-between items-center" style={{
-              borderColor: 'var(--bg-secondary)'
+              borderColor: 'var(--card-border)'
             }}>
               <span className="text-lg font-bold">Total</span>
               <span className="text-2xl font-bold" style={{ color: 'var(--accent-color)' }}>${orderTotal.toFixed(2)}</span>
