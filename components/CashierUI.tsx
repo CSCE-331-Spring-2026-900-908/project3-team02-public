@@ -76,7 +76,9 @@ export default function CashierUI() {
       ? menuItems
       : menuItems.filter(item => item.category === activeCategory)
 
-  const orderTotal = cart.reduce((sum, o) => sum + o.price * o.qty, 0)
+  const cartSubtotal = cart.reduce((sum, o) => sum + o.price * o.qty, 0)
+  const cartTax = cartSubtotal * 0.0825
+  const orderTotal = cartSubtotal + cartTax
 
   function openCustomization(item: MenuItem) {
     if (item.category.toLowerCase().includes('snack')) {
@@ -358,6 +360,14 @@ export default function CashierUI() {
             </div>
           </div>
 
+          <div className="flex justify-between text-sm font-normal text-gray-800">
+            <span>Subtotal</span>
+            <span>${cartSubtotal.toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between text-sm font-light text-gray-800">
+            <span>Tax</span>
+            <span>${cartTax.toFixed(2)}</span>
+          </div>
           <div className="flex justify-between text-sm font-semibold text-gray-800">
             <span>Total</span>
             <span>${orderTotal.toFixed(2)}</span>
