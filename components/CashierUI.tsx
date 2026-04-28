@@ -18,6 +18,59 @@ interface OrderItem {
   cartId: string
 }
 
+const SIZES = [
+  { name: 'Medium', price: 0.00 },
+  { name: 'Large', price: 0.75 }
+]
+const TEMPERATURES = [
+  { name: 'Hot', price: 0.00 },
+  { name: 'Cold', price: 0.00 }
+]
+const ICE_LEVELS = [
+  { name: 'Normal Ice', price: 0.00 },
+  { name: 'Extra Ice', price: 0.00 },
+  { name: 'Less Ice', price: 0.00 },
+  { name: 'No Ice', price: 0.00 }
+]
+const SUGAR_LEVELS = [
+  { name: '120% Sugar', price: 0.00 },
+  { name: '100% Sugar', price: 0.00 },
+  { name: '75% Sugar', price: 0.00 },
+  { name: '50% Sugar', price: 0.00 },
+  { name: '25% Sugar', price: 0.00 },
+  { name: '0% Sugar', price: 0.00 }
+]
+const MILK_ALTS = [
+  { name: 'Whole Milk', price: 0.00 },
+  { name: 'Oat Milk', price: 0.50 },
+  { name: 'Almond Milk', price: 0.50 },
+  { name: 'Soy Milk', price: 0.50 },
+  { name: 'Lactose-Free', price: 0.50 }
+]
+const TOPPINGS = [
+  { name: 'Boba', price: 0.50 },
+  { name: 'Grass Jelly', price: 0.50 },
+  { name: 'Lychee Jelly', price: 0.50 },
+  { name: 'Pudding', price: 0.50 },
+  { name: 'Aloe Vera', price: 0.50 },
+  { name: 'Cheese Foam', price: 0.75 },
+  { name: 'Pop Boba', price: 0.60 }
+]
+
+function ClientOnly({ children }: { children: React.ReactNode }) {
+  const [hasMounted, setHasMounted] = useState(false)
+
+  useEffect(() => {
+    setHasMounted(true)
+  }, [])
+
+  if (!hasMounted) {
+    return null
+  }
+
+  return <>{children}</>
+}
+
 export default function CashierUI() {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
   const [categories, setCategories] = useState<string[]>(['All'])
@@ -29,11 +82,12 @@ export default function CashierUI() {
 
   // Customization states
   const [customizingItem, setCustomizingItem] = useState<MenuItem | null>(null)
-  const [drinkSize, setDrinkSize] = useState('Medium')
-  const [drinkTemp, setDrinkTemp] = useState('Cold')
-  const [iceLevel, setIceLevel] = useState('Normal Ice')
-  const [sugarLevel, setSugarLevel] = useState('100% Sugar')
-  const [bobaOption, setBobaOption] = useState('Regular Boba')
+  const [drinkSize, setDrinkSize] = useState(SIZES[0])
+  const [temperature, setTemperature] = useState(TEMPERATURES[0])
+  const [iceLevel, setIceLevel] = useState(ICE_LEVELS[0])
+  const [sugarLevel, setSugarLevel] = useState(SUGAR_LEVELS[1])
+  const [milkAlt, setMilkAlt] = useState(MILK_ALTS[0])
+  const [selectedToppings, setSelectedToppings] = useState<{name: string, price: number}[]>([])
 
   useEffect(() => {
     async function fetchMenuItems() {
@@ -103,18 +157,31 @@ export default function CashierUI() {
     }
 
     setCustomizingItem(item)
-    setDrinkSize('Medium')
-    setDrinkTemp('Cold')
-    setIceLevel('Normal Ice')
-    setSugarLevel('100% Sugar')
-    setBobaOption('Regular Boba')
+    setDrinkSize(SIZES[0])
+    setTemperature(TEMPERATURES[0])
+    setIceLevel(ICE_LEVELS[0])
+    setSugarLevel(SUGAR_LEVELS[1])
+    setMilkAlt(MILK_ALTS[0])
+    setSelectedToppings([])
+  }
+
+  function toggleTopping(topping: {name: string, price: number}) {
+    setSelectedToppings(prev => 
+      prev.find(t => t.name === topping.name)
+        ? prev.filter(t => t.name !== topping.name)
+        : [...prev, topping]
+    )
   }
 
   function confirmCustomization() {
     if (!customizingItem) return
     
-    const customString = `${drinkTemp}, ${drinkSize}, ${iceLevel}, ${sugarLevel}, ${bobaOption}`
+    const toppingsStr = selectedToppings.length > 0 ? selectedToppings.map(t => t.name).join(', ') : 'No Toppings'
+    const customString = `${temperature.name}, ${drinkSize.name}, ${iceLevel.name}, ${sugarLevel.name}, ${milkAlt.name}, ${toppingsStr}`
     const cartId = `${customizingItem.id}-${customString}`
+    
+    const customizationsCost = drinkSize.price + milkAlt.price + selectedToppings.reduce((sum, t) => sum + t.price, 0)
+    const finalPrice = customizingItem.price + customizationsCost
 
     setCart(prev => {
       const existing = prev.find(o => o.cartId === cartId)
@@ -126,7 +193,7 @@ export default function CashierUI() {
       return [...prev, { 
         itemId: customizingItem.id, 
         itemName: customizingItem.name, 
-        price: customizingItem.price, 
+        price: finalPrice, 
         qty: 1,
         customizations: customString,
         cartId
@@ -199,67 +266,155 @@ export default function CashierUI() {
       {/* Cashier Customization Modal */}
       {customizingItem && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-md p-7 w-[760px] max-w-[95vw] shadow-xl flex flex-col gap-7">
+          <div className="bg-white rounded-md p-7 w-[860px] max-w-[95vw] shadow-xl flex flex-col gap-6 max-h-[90vh] overflow-y-auto">
             <h2 className="text-2xl font-semibold text-gray-900 border-b border-gray-100 pb-3">{customizingItem.name}</h2>
             
             <div className="flex flex-col gap-5">
-              <div className="flex items-center gap-4">
-                <span className="font-medium text-gray-500 text-base w-14 uppercase tracking-wider">Size</span>
-                <div className="flex gap-2 flex-1">
-                  {['Medium', 'Large'].map(opt => (
-                    <button key={opt} onClick={() => setDrinkSize(opt)} className={`flex-1 py-2.5 px-2 border rounded font-medium text-base transition-colors ${drinkSize === opt ? 'bg-gray-900 border-gray-900 text-white' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}>{opt}</button>
+              <div className="grid grid-cols-2 gap-5">
+                <div className="flex flex-col gap-2">
+                  <span className="font-medium text-gray-500 text-sm uppercase tracking-wider">Size</span>
+                  <div className="flex flex-wrap gap-2">
+                    {SIZES.map(opt => {
+                      const isSelected = drinkSize.name === opt.name;
+                      return (
+                        <button 
+                          key={opt.name} 
+                          onClick={() => setDrinkSize(opt)} 
+                          className={`py-2 px-3 border rounded font-medium text-sm transition-colors ${
+                            isSelected 
+                              ? 'bg-gray-900 border-gray-900 text-white' 
+                              : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          {opt.name}
+                          {opt.price > 0 && (
+                            <span 
+                              className="ml-1 text-[11px]" 
+                              style={{ color: isSelected ? 'rgba(255, 255, 255, 0.7)' : '#6b7280' }}
+                            >
+                              (+${opt.price.toFixed(2)})
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {!['refresher', 'slush'].includes((customizingItem?.category || '').toLowerCase()) && (
+                  <div className="flex flex-col gap-2">
+                    <span className="font-medium text-gray-500 text-sm uppercase tracking-wider">Temperature</span>
+                    <div className="flex flex-wrap gap-2">
+                      {TEMPERATURES.map(opt => (
+                        <button 
+                          key={opt.name} 
+                          onClick={() => setTemperature(opt)} 
+                          className={`py-2 px-3 border rounded font-medium text-sm transition-colors ${
+                            temperature.name === opt.name 
+                              ? 'bg-gray-900 border-gray-900 text-white' 
+                              : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          {opt.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              <div className="flex flex-col gap-2">
+                <span className="font-medium text-gray-500 text-sm uppercase tracking-wider">Ice</span>
+                <div className="flex flex-wrap gap-2">
+                  {ICE_LEVELS.map(opt => (
+                    <button key={opt.name} onClick={() => setIceLevel(opt)} className={`py-2 px-3 border rounded font-medium text-sm transition-colors ${iceLevel.name === opt.name ? 'bg-gray-900 border-gray-900 text-white' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}>
+                      {opt.name}
+                    </button>
                   ))}
                 </div>
               </div>
 
-              <div className="flex items-center gap-4">
-                <span className="font-medium text-gray-500 text-base w-14 uppercase tracking-wider">Temp</span>
-                <div className="flex gap-2 flex-1">
-                  {['Hot', 'Cold'].map(opt => (
-                    <button key={opt} onClick={() => setDrinkTemp(opt)} className={`flex-1 py-2.5 px-2 border rounded font-medium text-base transition-colors ${drinkTemp === opt ? 'bg-gray-900 border-gray-900 text-white' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}>{opt}</button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4">
-                <span className="font-medium text-gray-500 text-base w-14 uppercase tracking-wider">Ice</span>
-                <div className="flex gap-2 flex-1">
-                  {['Normal Ice', 'Less Ice', 'No Ice'].map(opt => (
-                    <button key={opt} onClick={() => setIceLevel(opt)} className={`flex-1 py-2.5 px-2 border rounded font-medium text-base transition-colors ${iceLevel === opt ? 'bg-gray-900 border-gray-900 text-white' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}>{opt}</button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4">
-                <span className="font-medium text-gray-500 text-base w-14 uppercase tracking-wider">Sugar</span>
-                <div className="flex gap-2 flex-1">
-                  {['120% Sugar', '100% Sugar', '75% Sugar', '50% Sugar', '25% Sugar', '0% Sugar'].map(opt => (
-                    <button 
-                      key={opt} 
-                      onClick={() => setSugarLevel(opt)} 
-                      className={`flex-1 py-2.5 px-1 border rounded font-medium text-sm transition-colors ${sugarLevel === opt ? 'bg-gray-900 border-gray-900 text-white' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}
-                    >
-                      {opt.replace(' Sugar', '')}
+              <div className="flex flex-col gap-2">
+                <span className="font-medium text-gray-500 text-sm uppercase tracking-wider">Sugar</span>
+                <div className="flex flex-wrap gap-2">
+                  {SUGAR_LEVELS.map(opt => (
+                    <button key={opt.name} onClick={() => setSugarLevel(opt)} className={`py-2 px-3 border rounded font-medium text-sm transition-colors ${sugarLevel.name === opt.name ? 'bg-gray-900 border-gray-900 text-white' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}>
+                      {opt.name.replace(' Sugar', '')}
                     </button>
                   ))}
                 </div>
               </div>
 
               {['milk tea', 'fruit tea', 'specialty'].includes((customizingItem?.category || '').toLowerCase()) && (
-                <div className="flex items-center gap-4">
-                  <span className="font-medium text-gray-500 text-base w-14 uppercase tracking-wider">Boba</span>
-                  <div className="flex gap-2 flex-1">
-                    {['Regular Boba', 'Extra Boba', 'No Boba'].map(opt => (
-                      <button key={opt} onClick={() => setBobaOption(opt)} className={`flex-1 py-2.5 px-2 border rounded font-medium text-base transition-colors ${bobaOption === opt ? 'bg-gray-900 border-gray-900 text-white' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}>{opt}</button>
-                    ))}
+                <>
+                  <div className="flex flex-col gap-2">
+                    <span className="font-medium text-gray-500 text-sm uppercase tracking-wider">Milk</span>
+                    <div className="flex flex-wrap gap-2">
+                      {MILK_ALTS.map(opt => {
+                        const isSelected = milkAlt.name === opt.name;
+                        return (
+                          <button 
+                            key={opt.name} 
+                            onClick={() => setMilkAlt(opt)} 
+                            className={`py-2 px-3 border rounded font-medium text-sm transition-colors ${
+                              isSelected 
+                                ? 'bg-gray-900 border-gray-900 text-white' 
+                                : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >
+                            {opt.name}
+                            {opt.price > 0 && (
+                              <span 
+                                className="ml-1 text-[11px]" 
+                                style={{ color: isSelected ? 'rgba(255, 255, 255, 0.7)' : '#6b7280' }}
+                              >
+                                (+${opt.price.toFixed(2)})
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
+
+                  <div className="flex flex-col gap-2">
+                    <span className="font-medium text-gray-500 text-sm uppercase tracking-wider">Toppings</span>
+                    <div className="flex flex-wrap gap-2">
+                      {TOPPINGS.map(opt => {
+                        const isSelected = selectedToppings.some(t => t.name === opt.name);
+                        return (
+                          <button 
+                            key={opt.name} 
+                            onClick={() => toggleTopping(opt)} 
+                            className={`py-2 px-3 border rounded font-medium text-sm transition-colors ${
+                              isSelected 
+                                ? 'bg-gray-900 border-gray-900 text-white' 
+                                : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >
+                            {opt.name}
+                            {opt.price > 0 && (
+                              <span 
+                                className="ml-1 text-[11px]" 
+                                style={{ color: isSelected ? 'rgba(255, 255, 255, 0.7)' : '#6b7280' }}
+                              >
+                                (+${opt.price.toFixed(2)})
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
               )}
             </div>
 
-            <div className="flex gap-3 mt-4">
+            <div className="flex gap-3 mt-4 border-t border-gray-100 pt-5">
               <button onClick={() => setCustomizingItem(null)} className="flex-1 py-3 bg-white text-gray-600 border border-gray-200 font-medium text-base rounded hover:bg-gray-50 transition-colors">Cancel</button>
-              <button onClick={confirmCustomization} className="flex-[2] py-3 bg-gray-900 text-white font-medium text-base rounded hover:bg-gray-800 transition-colors">Add to Order</button>
+              <button onClick={confirmCustomization} className="flex-[2] py-3 bg-gray-900 text-white font-medium text-base rounded hover:bg-gray-800 transition-colors">
+                Add to Order (+${((drinkSize.price + milkAlt.price + selectedToppings.reduce((sum, t) => sum + t.price, 0)) + customizingItem.price).toFixed(2)})
+              </button>
             </div>
           </div>
         </div>
@@ -361,24 +516,26 @@ export default function CashierUI() {
             </div>
           )}
 
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Payment</p>
-            <div className="flex gap-4">
-              {(['Card', 'Cash'] as const).map(type => (
-                <label key={type} className="flex items-center gap-1.5 cursor-pointer text-sm text-gray-700">
-                  <input
-                    type="radio"
-                    name="payment"
-                    value={type}
-                    checked={paymentType === type}
-                    onChange={() => setPaymentType(type)}
-                    className="accent-blue-600"
-                  />
-                  {type}
-                </label>
-              ))}
+          <ClientOnly>
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Payment</p>
+              <div className="flex gap-4">
+                {(['Card', 'Cash'] as const).map(type => (
+                  <label key={type} className="flex items-center gap-1.5 cursor-pointer text-sm text-gray-700">
+                    <input
+                      type="radio"
+                      name="payment"
+                      value={type}
+                      checked={paymentType === type}
+                      onChange={() => setPaymentType(type)}
+                      className="accent-blue-600"
+                    />
+                    {type}
+                  </label>
+                ))}
+              </div>
             </div>
-          </div>
+          </ClientOnly>
 
           <div className="flex justify-between text-sm font-semibold text-gray-800">
             <span>Total</span>
