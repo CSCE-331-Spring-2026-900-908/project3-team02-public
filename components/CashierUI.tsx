@@ -25,10 +25,12 @@ export default function CashierUI() {
   const [cart, setCart] = useState<OrderItem[]>([])
   const [paymentType, setPaymentType] = useState<'Card' | 'Cash'>('Card')
   const [submitted, setSubmitted] = useState(false)
+  const [queueMinutes, setQueueMinutes] = useState<number | null>(null)
 
   // Customization states
   const [customizingItem, setCustomizingItem] = useState<MenuItem | null>(null)
   const [drinkSize, setDrinkSize] = useState('Medium')
+  const [drinkTemp, setDrinkTemp] = useState('Cold')
   const [iceLevel, setIceLevel] = useState('Normal Ice')
   const [sugarLevel, setSugarLevel] = useState('100% Sugar')
   const [bobaOption, setBobaOption] = useState('Regular Boba')
@@ -104,6 +106,7 @@ export default function CashierUI() {
 
     setCustomizingItem(item)
     setDrinkSize('Medium')
+    setDrinkTemp('Cold')
     setIceLevel('Normal Ice')
     setSugarLevel('100% Sugar')
     setBobaOption('Regular Boba')
@@ -112,7 +115,7 @@ export default function CashierUI() {
   function confirmCustomization() {
     if (!customizingItem) return
     
-    const customString = `${drinkSize}, ${iceLevel}, ${sugarLevel}, ${bobaOption}`
+    const customString = `${drinkTemp}, ${drinkSize}, ${iceLevel}, ${sugarLevel}, ${bobaOption}`
     const cartId = `${customizingItem.id}-${customString}`
 
     setCart(prev => {
@@ -181,10 +184,12 @@ export default function CashierUI() {
         throw new Error('Failed to complete order.')
       }
 
+      const data = await res.json()
       setCart([])
       setPaymentType('Card')
+      setQueueMinutes(data.queueMinutes ?? null)
       setSubmitted(true)
-      setTimeout(() => setSubmitted(false), 3000)
+      setTimeout(() => setSubmitted(false), 5000)
     } catch (error) {
       console.error(error)
       alert('There was an error submitting the order. Please try again.')
@@ -208,7 +213,16 @@ export default function CashierUI() {
                   ))}
                 </div>
               </div>
-              
+
+              <div className="flex items-center gap-4">
+                <span className="font-medium text-gray-500 text-base w-14 uppercase tracking-wider">Temp</span>
+                <div className="flex gap-2 flex-1">
+                  {['Hot', 'Cold'].map(opt => (
+                    <button key={opt} onClick={() => setDrinkTemp(opt)} className={`flex-1 py-2.5 px-2 border rounded font-medium text-base transition-colors ${drinkTemp === opt ? 'bg-gray-900 border-gray-900 text-white' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}>{opt}</button>
+                  ))}
+                </div>
+              </div>
+
               <div className="flex items-center gap-4">
                 <span className="font-medium text-gray-500 text-base w-14 uppercase tracking-wider">Ice</span>
                 <div className="flex gap-2 flex-1">
@@ -221,20 +235,28 @@ export default function CashierUI() {
               <div className="flex items-center gap-4">
                 <span className="font-medium text-gray-500 text-base w-14 uppercase tracking-wider">Sugar</span>
                 <div className="flex gap-2 flex-1">
-                  {['100% Sugar', '75% Sugar', '50% Sugar', '25% Sugar', '0% Sugar'].map(opt => (
-                    <button key={opt} onClick={() => setSugarLevel(opt)} className={`flex-1 py-2.5 px-1 border rounded font-medium text-sm transition-colors ${sugarLevel === opt ? 'bg-gray-900 border-gray-900 text-white' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}>{opt.replace(' Sugar', '')}</button>
+                  {['120% Sugar', '100% Sugar', '75% Sugar', '50% Sugar', '25% Sugar', '0% Sugar'].map(opt => (
+                    <button 
+                      key={opt} 
+                      onClick={() => setSugarLevel(opt)} 
+                      className={`flex-1 py-2.5 px-1 border rounded font-medium text-sm transition-colors ${sugarLevel === opt ? 'bg-gray-900 border-gray-900 text-white' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+                    >
+                      {opt.replace(' Sugar', '')}
+                    </button>
                   ))}
                 </div>
               </div>
 
-              <div className="flex items-center gap-4">
-                <span className="font-medium text-gray-500 text-base w-14 uppercase tracking-wider">Boba</span>
-                <div className="flex gap-2 flex-1">
-                  {['Regular Boba', 'Extra Boba', 'No Boba'].map(opt => (
-                    <button key={opt} onClick={() => setBobaOption(opt)} className={`flex-1 py-2.5 px-2 border rounded font-medium text-base transition-colors ${bobaOption === opt ? 'bg-gray-900 border-gray-900 text-white' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}>{opt}</button>
-                  ))}
+              {['milk tea', 'fruit tea', 'specialty'].includes((customizingItem?.category || '').toLowerCase()) && (
+                <div className="flex items-center gap-4">
+                  <span className="font-medium text-gray-500 text-base w-14 uppercase tracking-wider">Boba</span>
+                  <div className="flex gap-2 flex-1">
+                    {['Regular Boba', 'Extra Boba', 'No Boba'].map(opt => (
+                      <button key={opt} onClick={() => setBobaOption(opt)} className={`flex-1 py-2.5 px-2 border rounded font-medium text-base transition-colors ${bobaOption === opt ? 'bg-gray-900 border-gray-900 text-white' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}>{opt}</button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             <div className="flex gap-3 mt-4">
@@ -337,7 +359,7 @@ export default function CashierUI() {
         <div className="px-4 py-3 border-t border-gray-200 bg-white space-y-3">
           {submitted && (
             <div className="rounded-lg bg-green-100 border border-green-300 text-green-800 text-sm px-3 py-2 text-center font-medium">
-              Order placed successfully!
+              Order placed!{queueMinutes != null ? ` Ready in ~${queueMinutes} min` : ''}
             </div>
           )}
 

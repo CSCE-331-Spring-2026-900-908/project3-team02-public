@@ -36,16 +36,6 @@
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-}
-
-body {
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-}
 
 /* AggTea maroon theme — scoped to customer kiosk only */
 .kiosk-theme {
@@ -72,25 +62,39 @@ body {
   --input-text: #2E2A28;
   --header-border: #D9D0C8;
 }
+@layer base{
 
-html {
-  font-size: calc(16px * var(--text-scale));
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: Arial, Helvetica, sans-serif;
+  }
+
+  body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+  }
+
+  html {
+    font-size: calc(16px * var(--text-scale));
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    color: var(--text-primary);
+  }
+
+  p, span, label, a, li {
+    color: var(--text-primary);
+  }
+
+  input,
+  select,
+  textarea,
+  [class*='border'] {
+    border-color: var(--border-color);
+  }
 }
 
-h1, h2, h3, h4, h5, h6 {
-  color: var(--text-primary);
-}
-
-p, span, label, a, li {
-  color: var(--text-primary);
-}
-
-input,
-select,
-textarea,
-[class*='border'] {
-  border-color: var(--border-color);
-}
 
 input[type="range"] {
   width: 100%;

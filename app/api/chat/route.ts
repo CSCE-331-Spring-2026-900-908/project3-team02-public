@@ -20,6 +20,7 @@ async function loadMenu(): Promise<MenuItem[]> {
       price: Number(r.price),
       category: r.category,
       description: r.description ?? '',
+      image: r.image ?? null,
     }))
   } catch (error) {
     console.error('Chat API: items query failed, using hardcoded fallback:', error)

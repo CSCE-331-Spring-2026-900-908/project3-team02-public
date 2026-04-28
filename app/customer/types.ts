@@ -4,6 +4,7 @@ export interface MenuItem {
   price: number
   category: string
   description: string
+  image?: string | null
 }
 
 export interface OrderItem {

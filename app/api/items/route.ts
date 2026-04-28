@@ -12,7 +12,7 @@ export async function GET() {
   try {
     const client = await pool.connect();
     const result = await client.query(`
-      SELECT itemid, itemname, price, category, description
+      SELECT itemid, itemname, price, category, description, image
       FROM items
       ORDER BY category, itemname;
     `);

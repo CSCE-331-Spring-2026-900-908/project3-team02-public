@@ -97,14 +97,16 @@ export default function KioskPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [cart, setCart] = useState<OrderItem[]>([])
   const [submitted, setSubmitted] = useState(false)
+  const [orderResult, setOrderResult] = useState<{ saleId: number; total: number; queueMinutes: number } | null>(null)
   const [addedNotification, setAddedNotification] = useState<string | null>(null)
 
   // Customization states
   const [customizingItem, setCustomizingItem] = useState<MenuItem | null>(null)
   const [drinkSize, setDrinkSize] = useState('Medium')
+  const [drinkTemp, setDrinkTemp] = useState('Cold')
   const [iceLevel, setIceLevel] = useState('Normal Ice')
   const [sugarLevel, setSugarLevel] = useState('100% Sugar')
-  const [bobaOption, setBobaOption] = useState<'Regular Boba' | 'Extra Boba' | 'No Boba'>('Regular Boba')
+  const [bobaOption, setBobaOption] = useState('')
 
   // Add these with your other state declarations
   const [weather, setWeather] = useState<any>(null)
@@ -247,6 +249,7 @@ export default function KioskPage() {
             price: Number(r.price),
             category: r.category,
             description: r.description ?? '',
+            image: r.image ?? null,
           }))
         setItems(normalized)
       } catch (error) {
@@ -322,17 +325,45 @@ export default function KioskPage() {
   const orderTotal = cartSubtotal + cartTax
 
   function openCustomization(item: MenuItem) {
+    if (item.category.toLowerCase().includes('snack')) {
+      const cartId = `${item.itemid}-no-customization`
+      
+      setCart(prev => {
+        const existing = prev.find(o => o.cartId === cartId)
+        if (existing) {
+          return prev.map(o =>
+            o.cartId === cartId ? { ...o, qty: o.qty + 1 } : o
+          )
+        }
+        return [...prev, { 
+          itemId: item.itemid, 
+          itemName: item.itemname, 
+          price: item.price, 
+          qty: 1,
+          cartId
+        }]
+      })
+
+      setAddedNotification(item.itemname)
+      setTimeout(() => setAddedNotification(null), 2000)
+      return
+    }
+
     setCustomizingItem(item)
     setDrinkSize('Medium')
+    setDrinkTemp('Cold')
     setIceLevel('Normal Ice')
     setSugarLevel('100% Sugar')
-    setBobaOption('Regular Boba')
+    setBobaOption('')
   }
 
   function confirmCustomization() {
     if (!customizingItem) return
     
-    const customString = `${drinkSize}, ${iceLevel}, ${sugarLevel}, ${bobaOption}`
+    const customParts = [drinkTemp, drinkSize, iceLevel, sugarLevel]
+    if (bobaOption) customParts.push(bobaOption)
+    const customString = customParts.join(', ')
+    
     const cartId = `${customizingItem.itemid}-${customString}`
 
     setCart(prev => {
@@ -438,10 +469,17 @@ export default function KioskPage() {
       }
 
       const data = await response.json()
-      alert(`Order submitted! Sale ID: ${data.saleId}\nTotal: $${Number(data.total).toFixed(2)}`)
       setCart([])
+      setOrderResult({
+        saleId: data.saleId,
+        total: Number(data.total),
+        queueMinutes: data.queueMinutes ?? 0,
+      })
       setSubmitted(true)
-      setTimeout(() => setSubmitted(false), 3000)
+      setTimeout(() => {
+        setSubmitted(false)
+        setOrderResult(null)
+      }, 8000)
     } catch (error) {
       console.error('Order Error:', error)
       alert('Could not submit order. Please check your network connectivity and try again.')
@@ -468,6 +506,48 @@ export default function KioskPage() {
         textSize={textSize}
         highContrast={highContrast}
       />
+
+      {/* Order Success Overlay */}
+      {submitted && orderResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div
+            className="rounded-3xl p-10 w-[420px] max-w-[90vw] shadow-2xl border-2 flex flex-col items-center gap-6 text-center"
+            style={{
+              backgroundColor: 'var(--bg-primary)',
+              borderColor: 'var(--button-success-text)',
+              color: 'var(--text-primary)',
+            }}
+          >
+            <div className="text-6xl">✓</div>
+            <h2 className="text-3xl font-bold" style={{ color: 'var(--button-success-text)' }}>
+              Order Placed!
+            </h2>
+            <p className="text-lg" style={{ color: 'var(--text-secondary)' }}>
+              Total: <strong>${orderResult.total.toFixed(2)}</strong>
+            </p>
+            {orderResult.queueMinutes > 0 && (
+              <div
+                className="rounded-2xl px-8 py-5 border-2"
+                style={{
+                  backgroundColor: 'var(--bg-secondary)',
+                  borderColor: 'var(--accent-color)',
+                }}
+              >
+                <p className="text-sm font-semibold uppercase tracking-widest mb-1" style={{ color: 'var(--text-muted)' }}>
+                  Estimated Wait
+                </p>
+                <p className="text-5xl font-bold" style={{ color: 'var(--accent-color)' }}>
+                  ~{orderResult.queueMinutes} min
+                </p>
+              </div>
+            )}
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+              This screen will close automatically
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Customization Modal */}
       {customizingItem && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm">
@@ -498,6 +578,23 @@ export default function KioskPage() {
               </div>
 
               <div>
+                <label className="block text-sm font-semibold mb-2">Temperature</label>
+                <select 
+                  value={drinkTemp} 
+                  onChange={(e) => setDrinkTemp(e.target. value)}
+                  className="w-full p-3 rounded-lg border"
+                  style={{
+                    backgroundColor: 'var(--input-bg)',
+                    borderColor: 'var(--input-border)',
+                    color: 'var(--input-text)'
+                  }}
+                >
+                  <option>Hot</option>
+                  <option>Cold</option>
+                </select>
+              </div>
+
+              <div>
                 <label className="block text-sm font-semibold mb-2">Ice Level</label>
                 <select 
                   value={iceLevel} 
@@ -510,6 +607,7 @@ export default function KioskPage() {
                   }}
                 >
                   <option>Normal Ice</option>
+                  <option>Extra Ice</option>
                   <option>Less Ice</option>
                   <option>No Ice</option>
                 </select>
@@ -527,6 +625,7 @@ export default function KioskPage() {
                     color: 'var(--input-text)'
                   }}
                 >
+                  <option>120% Sugar</option>
                   <option>100% Sugar</option>
                   <option>75% Sugar</option>
                   <option>50% Sugar</option>
@@ -535,32 +634,34 @@ export default function KioskPage() {
                 </select>
               </div>
 
-              <div>
-                <label className="block text-sm font-semibold mb-2">Boba</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { value: 'Regular Boba' as const, emoji: '🧋', label: 'Regular' },
-                    { value: 'Extra Boba' as const, emoji: '🧋+', label: 'Extra' },
-                    { value: 'No Boba' as const, emoji: '🚫🧋', label: 'None' },
-                  ].map(option => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      aria-pressed={bobaOption === option.value}
-                      onClick={() => setBobaOption(option.value)}
-                      className="rounded-lg border p-3 flex flex-col items-center justify-center transition-colors"
-                      style={{
-                        borderColor: bobaOption === option.value ? 'var(--accent-color)' : 'var(--card-border)',
-                        backgroundColor: bobaOption === option.value ? 'var(--accent-color)' : 'var(--card-bg)',
-                        color: bobaOption === option.value ? '#ffffff' : 'var(--card-text)'
-                      }}
-                    >
-                      <span className="text-xl">{option.emoji}</span>
-                      <span className="text-xs mt-1 font-medium">{option.label}</span>
-                    </button>
-                  ))}
+              {['milk tea', 'fruit tea', 'specialty'].includes((customizingItem?.category || '').toLowerCase()) && (
+                <div>
+                  <label className="block text-sm font-semibold mb-2">Boba</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { value: 'Regular Boba' as const, emoji: '🧋', label: 'Regular' },
+                      { value: 'Extra Boba' as const, emoji: '🧋+', label: 'Extra' },
+                      { value: 'No Boba' as const, emoji: '🚫🧋', label: 'None' },
+                    ].map(option => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        aria-pressed={bobaOption === option.value}
+                        onClick={() => setBobaOption(option.value)}
+                        className="rounded-lg border p-3 flex flex-col items-center justify-center transition-colors"
+                        style={{
+                          borderColor: bobaOption === option.value ? 'var(--accent-color)' : 'var(--card-border)',
+                          backgroundColor: bobaOption === option.value ? 'var(--accent-color)' : 'var(--card-bg)',
+                          color: bobaOption === option.value ? '#ffffff' : 'var(--card-text)'
+                        }}
+                      >
+                        <span className="text-xl">{option.emoji}</span>
+                        <span className="text-xs mt-1 font-medium">{option.label}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             <div className="mt-8 flex gap-3">
@@ -703,7 +804,8 @@ export default function KioskPage() {
                 <button
                   key={item.itemid}
                   onClick={() => openCustomization(item)}
-                  className="rounded-2xl border-2 p-6 text-left transition-all duration-200 cursor-pointer hover:-translate-y-0.5"
+                  // ADDED: flex flex-col to stack the image, text, and price
+                  className="rounded-2xl border-2 p-6 text-left transition-all duration-200 cursor-pointer hover:-translate-y-0.5 flex flex-col"
                   style={{
                     backgroundColor: 'var(--card-bg)',
                     borderColor: 'var(--card-border)',
@@ -712,12 +814,29 @@ export default function KioskPage() {
                   }}
                   onMouseEnter={e => { e.currentTarget.style.borderColor = '#500000'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(80, 0, 0, 0.12)' }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--card-border)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(46, 42, 40, 0.06)' }}
-                >
+                >                
+                  {item.image ? (
+                    <div className="w-full h-32 mb-4 rounded-xl overflow-hidden bg-black/5 flex-shrink-0">
+                      <img
+                        src={item.image}
+                        alt={item.itemname}
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-full h-32 mb-4 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+                      <span className="text-4xl opacity-50">🧋</span>
+                    </div>
+                  )}
+                 
                   <p className="font-bold text-lg leading-snug">{item.itemname}</p>
+                  
                   {item.description && (
                     <p className="mt-2 text-sm line-clamp-2" style={{ color: 'var(--text-muted)' }}>{item.description}</p>
                   )}
-                  <p className="mt-3 font-bold text-xl" style={{ color: 'var(--accent-color)' }}>${item.price.toFixed(2)}</p>
+                  
+                  {/* ADDED: mt-auto to push the price to the bottom if descriptions vary in length */}
+                  <p className="mt-auto pt-4 font-bold text-xl" style={{ color: 'var(--accent-color)' }}>${item.price.toFixed(2)}</p>
                 </button>
               ))}
             </div>
@@ -803,7 +922,7 @@ export default function KioskPage() {
               borderColor: 'var(--button-success-text)',
               color: 'var(--button-success-text)'
             }}>
-              Order placed successfully!
+              Order placed!{orderResult?.queueMinutes ? ` Ready in ~${orderResult.queueMinutes} min` : ''}
             </div>
           )}
 
