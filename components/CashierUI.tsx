@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useSession } from 'next-auth/react'
 
 interface MenuItem {
   id: number
@@ -19,6 +20,9 @@ interface OrderItem {
 }
 
 export default function CashierUI() {
+  const { data: session } = useSession()
+  const firstName = session?.user?.name?.split(' ')[0] ?? 'Cashier'
+
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
   const [categories, setCategories] = useState<string[]>(['All'])
   const [activeCategory, setActiveCategory] = useState<string>('All')
@@ -195,7 +199,13 @@ export default function CashierUI() {
   }
 
   return (
-    <div className="flex h-full w-full bg-white font-sans relative">
+    <div className="flex h-full w-full bg-white font-sans relative flex-col">
+      {/* Greeting banner */}
+      <div className="px-6 py-2 bg-blue-50 border-b border-blue-100 text-blue-800 text-sm font-medium">
+        Hello, {firstName}! 👋
+      </div>
+
+      <div className="flex flex-1 overflow-hidden relative">
       {/* Cashier Customization Modal */}
       {customizingItem && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
@@ -395,6 +405,7 @@ export default function CashierUI() {
           </button>
         </div>
       </aside>
+      </div>
     </div>
   )
 }
