@@ -30,6 +30,7 @@ export default function CashierUI() {
   // Customization states
   const [customizingItem, setCustomizingItem] = useState<MenuItem | null>(null)
   const [drinkSize, setDrinkSize] = useState('Medium')
+  const [drinkTemp, setDrinkTemp] = useState('Cold')
   const [iceLevel, setIceLevel] = useState('Normal Ice')
   const [sugarLevel, setSugarLevel] = useState('100% Sugar')
   const [bobaOption, setBobaOption] = useState('Regular Boba')
@@ -103,6 +104,7 @@ export default function CashierUI() {
 
     setCustomizingItem(item)
     setDrinkSize('Medium')
+    setDrinkTemp('Cold')
     setIceLevel('Normal Ice')
     setSugarLevel('100% Sugar')
     setBobaOption('Regular Boba')
@@ -111,7 +113,7 @@ export default function CashierUI() {
   function confirmCustomization() {
     if (!customizingItem) return
     
-    const customString = `${drinkSize}, ${iceLevel}, ${sugarLevel}, ${bobaOption}`
+    const customString = `${drinkTemp}, ${drinkSize}, ${iceLevel}, ${sugarLevel}, ${bobaOption}`
     const cartId = `${customizingItem.id}-${customString}`
 
     setCart(prev => {
@@ -202,6 +204,15 @@ export default function CashierUI() {
             
             <div className="flex flex-col gap-5">
               <div className="flex items-center gap-4">
+                <span className="font-medium text-gray-500 text-base w-14 uppercase tracking-wider">Temp</span>
+                <div className="flex gap-2 flex-1">
+                  {['Hot', 'Cold'].map(opt => (
+                    <button key={opt} onClick={() => setDrinkTemp(opt)} className={`flex-1 py-2.5 px-2 border rounded font-medium text-base transition-colors ${drinkTemp === opt ? 'bg-gray-900 border-gray-900 text-white' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}>{opt}</button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4">
                 <span className="font-medium text-gray-500 text-base w-14 uppercase tracking-wider">Size</span>
                 <div className="flex gap-2 flex-1">
                   {['Medium', 'Large'].map(opt => (
@@ -209,7 +220,7 @@ export default function CashierUI() {
                   ))}
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-4">
                 <span className="font-medium text-gray-500 text-base w-14 uppercase tracking-wider">Ice</span>
                 <div className="flex gap-2 flex-1">
