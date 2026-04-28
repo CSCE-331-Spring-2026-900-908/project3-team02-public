@@ -103,8 +103,9 @@ export default function KioskPage() {
   // Customization states
   const [customizingItem, setCustomizingItem] = useState<MenuItem | null>(null)
   const [drinkSize, setDrinkSize] = useState('Medium')
+  const [drinkTemp, setDrinkTemp] = useState('Cold')
   const [iceLevel, setIceLevel] = useState('Normal Ice')
-  const [sugarLevel, setSugarLevel] = useState('120% Sugar')
+  const [sugarLevel, setSugarLevel] = useState('100% Sugar')
   const [bobaOption, setBobaOption] = useState('')
 
   // Add these with your other state declarations
@@ -348,6 +349,7 @@ export default function KioskPage() {
 
     setCustomizingItem(item)
     setDrinkSize('Medium')
+    setDrinkTemp('Cold')
     setIceLevel('Normal Ice')
     setSugarLevel('100% Sugar')
     setBobaOption('')
@@ -356,7 +358,7 @@ export default function KioskPage() {
   function confirmCustomization() {
     if (!customizingItem) return
     
-    const customParts = [drinkSize, iceLevel, sugarLevel]
+    const customParts = [drinkTemp, drinkSize, iceLevel, sugarLevel]
     if (bobaOption) customParts.push(bobaOption)
     const customString = customParts.join(', ')
     
@@ -570,6 +572,23 @@ export default function KioskPage() {
                 >
                   <option>Medium</option>
                   <option>Large</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-2">Temperature</label>
+                <select 
+                  value={drinkTemp} 
+                  onChange={(e) => setDrinkTemp(e.target. value)}
+                  className="w-full p-3 rounded-lg border"
+                  style={{
+                    backgroundColor: 'var(--input-bg)',
+                    borderColor: 'var(--input-border)',
+                    color: 'var(--input-text)'
+                  }}
+                >
+                  <option>Hot</option>
+                  <option>Cold</option>
                 </select>
               </div>
 
