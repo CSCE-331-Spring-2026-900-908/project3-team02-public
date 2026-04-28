@@ -21,7 +21,7 @@ interface OrderItem {
 
 export default function CashierUI() {
   const { data: session } = useSession()
-  const firstName = session?.user?.name?.split(' ')[0] ?? 'Cashier'
+  const firstName = session?.user?.name?.trim().split(' ')[0] || 'Cashier'
 
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
   const [categories, setCategories] = useState<string[]>(['All'])
