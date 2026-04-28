@@ -204,19 +204,19 @@ export default function CashierUI() {
             
             <div className="flex flex-col gap-5">
               <div className="flex items-center gap-4">
-                <span className="font-medium text-gray-500 text-base w-14 uppercase tracking-wider">Temp</span>
+                <span className="font-medium text-gray-500 text-base w-14 uppercase tracking-wider">Size</span>
                 <div className="flex gap-2 flex-1">
-                  {['Hot', 'Cold'].map(opt => (
-                    <button key={opt} onClick={() => setDrinkTemp(opt)} className={`flex-1 py-2.5 px-2 border rounded font-medium text-base transition-colors ${drinkTemp === opt ? 'bg-gray-900 border-gray-900 text-white' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}>{opt}</button>
+                  {['Medium', 'Large'].map(opt => (
+                    <button key={opt} onClick={() => setDrinkSize(opt)} className={`flex-1 py-2.5 px-2 border rounded font-medium text-base transition-colors ${drinkSize === opt ? 'bg-gray-900 border-gray-900 text-white' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}>{opt}</button>
                   ))}
                 </div>
               </div>
 
               <div className="flex items-center gap-4">
-                <span className="font-medium text-gray-500 text-base w-14 uppercase tracking-wider">Size</span>
+                <span className="font-medium text-gray-500 text-base w-14 uppercase tracking-wider">Temp</span>
                 <div className="flex gap-2 flex-1">
-                  {['Medium', 'Large'].map(opt => (
-                    <button key={opt} onClick={() => setDrinkSize(opt)} className={`flex-1 py-2.5 px-2 border rounded font-medium text-base transition-colors ${drinkSize === opt ? 'bg-gray-900 border-gray-900 text-white' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}>{opt}</button>
+                  {['Hot', 'Cold'].map(opt => (
+                    <button key={opt} onClick={() => setDrinkTemp(opt)} className={`flex-1 py-2.5 px-2 border rounded font-medium text-base transition-colors ${drinkTemp === opt ? 'bg-gray-900 border-gray-900 text-white' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}>{opt}</button>
                   ))}
                 </div>
               </div>
