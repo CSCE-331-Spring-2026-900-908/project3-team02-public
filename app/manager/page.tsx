@@ -1,6 +1,7 @@
 import { signIn, auth } from "@/auth"
 import { redirect } from "next/navigation"
 import QRLoginSection from "@/components/QRLoginSection"
+import PinLoginForm from "@/components/PinLoginForm"
 
 export default async function ManagerLoginPage() {
   const session = await auth()
@@ -45,6 +46,7 @@ export default async function ManagerLoginPage() {
         </div>
 
         <QRLoginSection />
+        <PinLoginForm />
       </div>
     </div>
   )
