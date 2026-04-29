@@ -105,10 +105,14 @@ export default function KioskPage() {
   const [drinkSize, setDrinkSize] = useState('Medium')
   const [drinkTemp, setDrinkTemp] = useState('Cold')
   const [iceLevel, setIceLevel] = useState('Normal Ice')
-  const [sugarLevel, setSugarLevel] = useState('100% Sugar')
+  const [sugarLevel, setSugarLevel] = useState('100% (Regular) Sweetness')
   const [bobaOption, setBobaOption] = useState('')
   const [milkAlt, setMilkAlt] = useState('Whole Milk')
   const [selectedToppings, setSelectedToppings] = useState<string[]>([])
+
+  const [customizationsByCategory, setCustomizationsByCategory] = useState<{
+    [key: string]: Customization[]
+  }>({})
 
   // Add these with your other state declarations
   const [weather, setWeather] = useState<any>(null)
@@ -258,7 +262,39 @@ export default function KioskPage() {
         console.error('Error fetching items, using hardcoded fallback:', error)
       }
     }
+
+    async function fetchCustomizations() {
+      try {
+        const response = await fetch('/api/customizations')
+        if (!response.ok) return
+        const rows = await response.json()
+        if (!Array.isArray(rows) || rows.length === 0) return
+
+        const normalized: Customization[] = rows
+          .filter((r: any) => r.isactive !== false)
+          .map((r: any) => ({
+            customizationid: Number(r.customizationid),
+            name: String(r.name),
+            category: String(r.category),
+            price: Number(r.price),
+            ingredients: r.ingredients ?? undefined,
+            isactive: Boolean(r.isactive),
+          }))
+
+        const grouped: Record<string, Customization[]> = {}
+        for (const custom of normalized) {
+          if (!grouped[custom.category]) grouped[custom.category] = []
+          grouped[custom.category].push(custom)
+        }
+
+        setCustomizationsByCategory(grouped)
+      } catch (error) {
+        console.error('Error fetching customizations:', error)
+      }
+    }
+
     fetchItems()
+    fetchCustomizations()
   }, [])
 
   // Weather API
@@ -355,7 +391,7 @@ export default function KioskPage() {
     setDrinkSize('Medium')
     setDrinkTemp('Cold')
     setIceLevel('Normal Ice')
-    setSugarLevel('100% Sugar')
+    setSugarLevel('100% (Regular) Sweetness')
     setMilkAlt('Whole Milk')
     setSelectedToppings([])
     setBobaOption('')
@@ -364,6 +400,19 @@ export default function KioskPage() {
   function confirmCustomization() {
     if (!customizingItem) return
     
+    // Calculate the total customized price
+    const baseCost = customizingItem.price
+    const sizeUpcharge = customizationsByCategory['Size']?.find(s => s.name === drinkSize)?.price ?? 0
+    const milkUpcharge = ['milk tea', 'fruit tea', 'specialty'].includes((customizingItem?.category || '').toLowerCase()) 
+      ? (customizationsByCategory['Milk']?.find(m => m.name === milkAlt)?.price ?? 0)
+      : 0
+    const toppingsCost = selectedToppings.reduce((sum, toppingName) => {
+      const topping = customizationsByCategory['Topping']?.find(t => t.name === toppingName)
+      return sum + (topping?.price ?? 0)
+    }, 0)
+    const bobaCost = bobaOption === 'Extra Boba' ? 1.00 : bobaOption === 'Regular Boba' ? 0.50 : 0
+    const totalPrice = baseCost + sizeUpcharge + milkUpcharge + toppingsCost + bobaCost
+    
     const toppingStr = selectedToppings.length > 0 ? selectedToppings.join(', ') : ''
     const customParts = [drinkTemp, drinkSize, iceLevel, sugarLevel]
     if (milkAlt && ['milk tea', 'fruit tea', 'specialty'].includes((customizingItem?.category || '').toLowerCase())) {
@@ -371,7 +420,6 @@ export default function KioskPage() {
     }
     if (toppingStr) customParts.push(toppingStr)
     
-    // Add both Regular Boba and Extra Boba if Extra Boba is selected
     if (bobaOption === 'Extra Boba') {
       customParts.push('Regular Boba')
       customParts.push('Extra Boba')
@@ -380,7 +428,6 @@ export default function KioskPage() {
     }
     
     const customString = customParts.join(', ')
-    
     const cartId = `${customizingItem.itemid}-${customString}`
 
     setCart(prev => {
@@ -393,7 +440,7 @@ export default function KioskPage() {
       return [...prev, { 
         itemId: customizingItem.itemid, 
         itemName: customizingItem.itemname, 
-        price: customizingItem.price, 
+        price: totalPrice,
         qty: 1,
         customizations: customString,
         cartId
@@ -592,8 +639,11 @@ export default function KioskPage() {
                       color: 'var(--input-text)'
                     }}
                   >
-                    <option>Medium</option>
-                    <option>Large (+$0.75)</option>
+                    {customizationsByCategory['Size']?.map(opt => (
+                      <option key={opt.customizationid} value={opt.name}>
+                        {opt.name}{opt.price > 0 ? ` (+$${opt.price.toFixed(2)})` : ''}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -610,8 +660,11 @@ export default function KioskPage() {
                         color: 'var(--input-text)'
                       }}
                     >
-                      <option>Hot</option>
-                      <option>Cold</option>
+                      {customizationsByCategory['Temperature']?.map(opt => (
+                        <option key={opt.customizationid} value={opt.name}>
+                          {opt.name}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 )}
@@ -628,10 +681,11 @@ export default function KioskPage() {
                       color: 'var(--input-text)'
                     }}
                   >
-                    <option>Normal Ice</option>
-                    <option>Extra Ice</option>
-                    <option>Less Ice</option>
-                    <option>No Ice</option>
+                    {customizationsByCategory['Ice']?.map(opt => (
+                      <option key={opt.customizationid} value={opt.name}>
+                        {opt.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -649,12 +703,14 @@ export default function KioskPage() {
                       color: 'var(--input-text)'
                     }}
                   >
-                    <option>120% Sugar</option>
-                    <option>100% Sugar</option>
-                    <option>75% Sugar</option>
-                    <option>50% Sugar</option>
-                    <option>25% Sugar</option>
-                    <option>0% Sugar</option>
+                    {customizationsByCategory['Sweetness']?.sort((a, b) => {
+                      const orderMap: { [key: string]: number } = { '0% Sweetness': 0, '20% Sweetness': 1, '50% Sweetness': 2, '100% (Regular) Sweetness': 3, '120% Sweetness': 4 };
+                      return (orderMap[a.name] ?? 999) - (orderMap[b.name] ?? 999);
+                    }).map(opt => (
+                      <option key={opt.customizationid} value={opt.name}>
+                        {opt.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -671,11 +727,11 @@ export default function KioskPage() {
                         color: 'var(--input-text)'
                       }}
                     >
-                      <option>Whole Milk</option>
-                      <option>Oat Milk (+$0.50)</option>
-                      <option>Almond Milk (+$0.50)</option>
-                      <option>Soy Milk (+$0.50)</option>
-                      <option>Lactose-Free (+$0.50)</option>
+                      {customizationsByCategory['Milk']?.map(opt => (
+                        <option key={opt.customizationid} value={opt.name}>
+                          {opt.name}{opt.price > 0 ? ` (+$${opt.price.toFixed(2)})` : ''}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 )}
@@ -686,15 +742,11 @@ export default function KioskPage() {
                   <div>
                     <label className="block text-sm font-semibold mb-3">Toppings</label>
                     <div className="grid grid-cols-3 gap-3">
-                      {[
-                        { name: 'Grass Jelly', price: 0.50 },
-                        { name: 'Lychee Jelly', price: 0.50 },
-                        { name: 'Pudding', price: 0.50 },
-                        { name: 'Aloe Vera', price: 0.50 },
-                        { name: 'Cheese Foam', price: 0.75 }
-                      ].map(topping => (
+                      {customizationsByCategory['Topping']?.filter(topping => 
+                        topping.name !== 'Tapioca Pearls (Boba)' && topping.name !== 'Extra Boba'
+                      ).map(topping => (
                         <button
-                          key={topping.name}
+                          key={topping.customizationid}
                           type="button"
                           onClick={() => {
                             setSelectedToppings(prev =>
@@ -711,7 +763,7 @@ export default function KioskPage() {
                           }}
                         >
                           <div className="flex flex-col items-center justify-center">
-                            <span 
+                            <span
                               className="text-sm"
                               style={{
                                 color: selectedToppings.includes(topping.name) ? '#ffffff' : 'var(--card-text)',
@@ -721,7 +773,7 @@ export default function KioskPage() {
                               {topping.name}
                             </span>
                             {topping.price > 0 && (
-                              <span 
+                              <span
                                 className="text-xs mt-0.5"
                                 style={{
                                   opacity: selectedToppings.includes(topping.name) ? 0.95 : 0.75,
@@ -805,7 +857,20 @@ export default function KioskPage() {
                   color: 'var(--button-primary-text)'
                 }}
               >
-                Add to Cart
+                {(() => {
+                  const baseCost = customizingItem?.price ?? 0
+                  const sizeUpcharge = customizationsByCategory['Size']?.find(s => s.name === drinkSize)?.price ?? 0
+                  const milkUpcharge = ['milk tea', 'fruit tea', 'specialty'].includes((customizingItem?.category || '').toLowerCase()) 
+                    ? (customizationsByCategory['Milk']?.find(m => m.name === milkAlt)?.price ?? 0)
+                    : 0
+                  const toppingsCost = selectedToppings.reduce((sum, toppingName) => {
+                    const topping = customizationsByCategory['Topping']?.find(t => t.name === toppingName)
+                    return sum + (topping?.price ?? 0)
+                  }, 0)
+                  const bobaCost = bobaOption === 'Extra Boba' ? 1.00 : bobaOption === 'Regular Boba' ? 0.50 : 0
+                  const totalPrice = baseCost + sizeUpcharge + milkUpcharge + toppingsCost + bobaCost
+                  return `Add to Cart — $${totalPrice.toFixed(2)}`
+                })()}
               </button>
             </div>
           </div>
@@ -1231,4 +1296,13 @@ export default function KioskPage() {
       )}
     </div>
   );
+}
+
+interface Customization {
+  customizationid: number
+  name: string
+  category: string
+  price: number
+  ingredients?: string
+  isactive: boolean
 }
