@@ -33,7 +33,11 @@ export async function POST(req: Request) {
     const items = body.items ?? []
     const paymentTypeId = body.paymentTypeId
     const employeeId = body.employeeId ?? DEFAULT_EMPLOYEE_ID
-
+    
+    console.log('=== ORDER RECEIVED ===')
+    console.log('Raw body:', JSON.stringify(body, null, 2))
+    console.log('Items:', JSON.stringify(items, null, 2))
+    
     if (!items.length) {
       return NextResponse.json({ error: 'Cart is empty.' }, { status: 400 })
     }
@@ -58,13 +62,7 @@ export async function POST(req: Request) {
       const lineSubtotal = item.price * item.qty
       const sweetnessLevel = parseSweetnessLevel(item.customizations)
 
-      await client.query(
-        `INSERT INTO saleslineitem (saleid, itemid, sweetnesslevel, customization, subtotal)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [saleId, item.itemId, sweetnessLevel, item.customizations ?? '', lineSubtotal]
-      )
-
-      // Decrement inventory based on recipe * quantity
+      // Decrement inventory for base item recipe
       await client.query(
         `UPDATE inventory i
          SET quantity = i.quantity - (r.quantity * $2)
@@ -72,6 +70,54 @@ export async function POST(req: Request) {
          WHERE r.inventoryid = i.ingredientid
            AND r.itemid = $1`,
         [item.itemId, item.qty]
+      )
+
+      // Decrement inventory for customization recipes
+      if (item.customizations) {
+        try {
+          // Split customizations and clean them
+          const customizationNames = item.customizations
+            .split(', ')
+            .map(c => c.trim())
+            .filter(c => c.length > 0)
+
+          console.log('Processing customizations:', customizationNames, 'for qty:', item.qty)
+
+          if (customizationNames.length > 0) {
+            // Get customization IDs that match the names
+            const customResult = await client.query(
+              `SELECT customizationid FROM customizations 
+               WHERE LOWER(TRIM(name)) = ANY(SELECT LOWER(TRIM(unnest($1::text[]))))`,
+              [customizationNames]
+            )
+
+            const customizationIds = customResult.rows.map(r => r.customizationid)
+            console.log('Found customization IDs:', customizationIds)
+
+            if (customizationIds.length > 0) {
+              // Decrement inventory based on customization_recipes
+              const updateResult = await client.query(
+                `UPDATE inventory i
+                 SET quantity = i.quantity - (cr.quantity * $2)
+                 FROM customization_recipes cr
+                 WHERE cr.ingredientid = i.ingredientid
+                   AND cr.customizationid = ANY($1)`,
+                [customizationIds, item.qty]
+              )
+              console.log('Updated customization inventory rows:', updateResult.rowCount)
+            }
+          }
+        } catch (customError) {
+          console.error('Error updating customization inventory:', customError)
+          throw customError
+        }
+      }
+
+      // Insert saleslineitem
+      await client.query(
+        `INSERT INTO saleslineitem (saleid, itemid, sweetnesslevel, customization, subtotal)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [saleId, item.itemId, sweetnessLevel, item.customizations ?? 'no customization', lineSubtotal]
       )
     }
 
