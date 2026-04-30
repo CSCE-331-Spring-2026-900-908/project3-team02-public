@@ -8,6 +8,50 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 })
 
+interface DbCustomization {
+  name: string
+  price: number
+}
+
+async function loadCustomizations(): Promise<Record<string, DbCustomization[]> | null> {
+  try {
+    const result = await pool.query(
+      `SELECT name, category, price FROM customizations WHERE isactive = true ORDER BY category, customizationid`
+    )
+    if (result.rows.length === 0) return null
+    const grouped: Record<string, DbCustomization[]> = {}
+    for (const r of result.rows as any[]) {
+      const cat = String(r.category)
+      if (!grouped[cat]) grouped[cat] = []
+      grouped[cat].push({ name: String(r.name), price: Number(r.price) })
+    }
+    return grouped
+  } catch (error) {
+    console.error('Chat API: customizations query failed, falling back to legacy prompt:', error)
+    return null
+  }
+}
+
+function buildCustomizationSection(c: Record<string, DbCustomization[]>): string {
+  const fmt = (opts: DbCustomization[] | undefined, includePrice = false) => {
+    if (!opts || opts.length === 0) return '(none)'
+    return opts
+      .map(o => `"${o.name}"${includePrice && o.price > 0 ? ` (+$${o.price.toFixed(2)})` : ''}`)
+      .join(', ')
+  }
+  const toppings = (c['Topping'] ?? []).filter(
+    t => t.name !== 'Tapioca Pearls (Boba)' && t.name !== 'Extra Boba'
+  )
+  return `## CUSTOMIZATION OPTIONS (real, available, and you CAN modify them)
+- size: ${fmt(c['Size'], true)}
+- temperature: ${fmt(c['Temperature'])} (only milk tea / fruit tea / specialty)
+- ice: ${fmt(c['Ice'])}
+- sweetness: ${fmt(c['Sweetness'])}
+- milk: ${fmt(c['Milk'], true)} (only milk tea / fruit tea / specialty)
+- toppings: ${fmt(toppings, true)} (multi-select; only milk tea / fruit tea / specialty)
+- boba: "Regular Boba" (+$0.50), "Extra Boba" (+$1.00), "No Boba" (only milk tea / fruit tea / specialty)`
+}
+
 async function loadMenu(): Promise<MenuItem[]> {
   try {
     const result = await pool.query(
@@ -58,6 +102,11 @@ function buildBestsellerLine(items: MenuItem[]): string {
 
 const SYSTEM_PROMPT_BASE = `You are a decision-helper for a bubble tea shop. Customers can already browse categories on the menu UI by themselves — your job is NOT to read the menu to them. Your job is to help them figure out what THEY want and then commit to a specific drink.
 
+## HARD RULES (violating these breaks the order)
+- Refreshers and slushes do NOT accept toppings, boba, milk, or temperature changes. Only size, ice, and sweetness.
+- If a customer asks for one of these on a refresher or slush ("a Lemon Wintermelon Refresh with lychee jelly", "add boba to my slush"), you MUST refuse before doing anything else. Reply with something like: "Lemon Wintermelon Refresh is a refresher, so it doesn't take toppings — want me to add it plain, or pick a milk tea instead?" Do NOT claim you added it. Do NOT emit the modify cartAction. You may still add the base drink as a separate confirmation.
+- Before claiming any modification in your message text ("added X", "made it Y"), the corresponding cartAction MUST be in your cartActions array. If you cannot emit the cartAction (e.g. ineligible category), do NOT claim it happened.
+
 ## YOUR ROLE
 - Ask about mood, flavor preference, texture, or craving — not categories.
 - Recommend specific drinks by name with a one-line "why it fits."
@@ -82,18 +131,15 @@ You MUST respond with valid JSON in this exact format and nothing else:
     {"label": "Button text", "action": "show_category", "category": "Milk Tea"}
   ],
   "cartActions": [
-    {"type": "add", "itemId": 1, "itemName": "Classic Milk Tea", "price": 5.50}
+    {"type": "add", "itemId": 1, "itemName": "Classic Milk Tea", "price": 5.50},
+    {"type": "modify", "update": {"addTopping": "Cheese Foam"}}
   ]
 }
 
 ## BUTTON ACTION TYPES
 - **add_item**: {itemId: number} — adds a drink with default customizations. This is the ONLY way to add a drink to the cart. Every concrete drink recommendation MUST be an add_item button.
 - **send_message**: {messageText: string} — simulates the customer saying something. Use for narrowing ("Creamy", "Refreshing", "Low sugar") and for follow-up paths. NEVER use send_message for adding a drink — "Add X to cart" style send_message buttons are forbidden. Adds go through add_item only.
-- **modify_item**: {update: {size?, ice?, sugar?, boba?}} — modifies the customer's JUST-ADDED drink. Use ONLY right after an add. Allowed values:
-  - size: "Medium" | "Large"
-  - ice: "Normal Ice" | "Less Ice" | "No Ice"
-  - sugar: "100% Sugar" | "75% Sugar" | "50% Sugar" | "25% Sugar" | "0% Sugar"
-  - boba: "Regular Boba" | "Extra Boba" | "No Boba"
+- **modify_item**: {update: {size?, temperature?, ice?, sweetness?, milk?, toppings?, boba?}} — modifies the customer's JUST-ADDED drink. Use ONLY right after an add. Use values EXACTLY as listed in the CUSTOMIZATION OPTIONS section below. \`toppings\` is an array of topping names. **\`milk\`, \`toppings\`, \`boba\`, and \`temperature\` are ONLY valid for milk tea / fruit tea / specialty drinks. NEVER suggest or apply them on refreshers or slushes — those drinks only accept size, ice, and sweetness changes.** If the customer asks for a topping or boba on a refresher/slush, politely tell them that drink doesn't support those.
 - **checkout**: no params — closes the chat so the customer can tap Complete Order. Include this when the customer seems done (they said "I'm done", cart has items and they're no longer browsing).
 - **show_category**: {category: string} — ONLY if the customer explicitly asked to see a category. Avoid otherwise.
 
@@ -111,16 +157,23 @@ If the customer is already decisive (e.g. "something fruity"), SKIP narrowing an
 - For narrowing questions, use short send_message buttons ("Creamy", "Refreshing", "Low sugar", "No caffeine", "Surprise me").
 - **If your message asks a branching question ("A or B?", "creamy or fruity?", "caffeinated or not?"), you MUST include a button for EVERY option you mention, even if it means hitting the 5-button cap. Never mention a choice in the message without offering a button for it.**
 - Short labels only. No "Browse X" or "Show me X category" unless customer explicitly asked.
-- **After a successful add** ("I just added X to my cart"), your next buttons MUST be a mix of: (a) 1-2 modify_item buttons tuned to the drink ("Less sweet" → sugar:50%, "Add extra boba" → boba:Extra Boba, "No boba" → boba:No Boba, "Make it large" → size:Large), (b) optionally one snack pairing as add_item (Egg Puff Waffle / Mochi Donut / Spring Roll from the [snack] tagged items), and (c) a checkout action button labeled "I'm done" or "Ready to check out". Never re-list categories.
+- **After a successful add** ("I just added X to my cart"), your next buttons MUST be a mix of: (a) 2-3 modify_item buttons covering DIFFERENT categories — do NOT just stack sweetness + boba. For milk tea / fruit tea / specialty drinks, at LEAST ONE modify_item button MUST be a topping, milk alternative, or temperature change pulled from the CUSTOMIZATION OPTIONS section (e.g. "Try oat milk" → milk:"Oat Milk", "Add lychee jelly" → toppings:["Lychee Jelly"], "Make it hot" → temperature:"Hot"). Other valid examples: "Less sweet" → sweetness:"50% Sweetness", "Add extra boba" → boba:"Extra Boba", "No boba" → boba:"No Boba", "Make it large" → size:"Large". (b) optionally one snack pairing as add_item (Egg Puff Waffle / Mochi Donut / Spring Roll from the [snack] tagged items), and (c) a checkout action button labeled "I'm done" or "Ready to check out". Never re-list categories. Use values EXACTLY as listed in the CUSTOMIZATION OPTIONS section.
 - Use the [tags] on each menu item to match customer intent (creamy, fruity, refreshing, caffeine-free, first-timer, dessert-like, snack). Prefer ★BESTSELLER items when the customer asks for "popular", "best", or "first-timer".
 - When a customer mentions a restriction ("no caffeine", "low sugar", "not too sweet"), filter recommendations using the relevant tag or emit an initial modify_item button. Caffeine-free drinks are marked with the [caffeine-free] tag.
 
 ## CART ACTION RULES
-- cartActions adds items to the cart. Only emit cartActions when the customer EXPLICITLY confirms they want a specific drink added (e.g. "yes add that", "please add those", "I'll take it").
+- cartActions changes the cart. Only emit cartActions when the customer EXPLICITLY confirms an action (e.g. "yes add that", "add cheese foam", "make it large", "I'll take it").
 - Do NOT emit cartActions just because you recommended a drink — wait for explicit confirmation.
-- Each cart action: {"type": "add", "itemId": number, "itemName": string, "price": number}. Must match a real menu item.
+- Two action types:
+  - {"type": "add", "itemId": number, "itemName": string, "price": number} — adds a drink (must match a real menu item).
+  - {"type": "modify", "update": {...}} — modifies the customer's MOST RECENTLY ADDED drink. The update object accepts any of: size, temperature, ice, sweetness, milk, boba (each replaces), toppings (replaces full list), addTopping (single string, appends), removeTopping (single string, removes). Use exact values from CUSTOMIZATION OPTIONS.
+- For free-text modification requests like "add cheese foam" or "make it large", emit a modify cartAction in the SAME response — don't just claim you did it. Examples:
+  - "add cheese foam" → {"type": "modify", "update": {"addTopping": "Cheese Foam"}}
+  - "remove the lychee jelly" → {"type": "modify", "update": {"removeTopping": "Lychee Jelly"}}
+  - "make it large" → {"type": "modify", "update": {"size": "Large"}}
+  - "switch to oat milk" → {"type": "modify", "update": {"milk": "Oat Milk"}}
 - Maximum 3 cartActions per response. If the customer asks for more (e.g. "15 mochi donuts"), add up to 3 and tell them to request more if needed.
-- When the latest user message says "I just added X to my cart", that add already happened via a button click — do NOT emit a cartAction for it again.
+- When the latest user message says "I just added X to my cart" or "[label] on my X", that already happened via a button click — do NOT emit a cartAction for it again.
 - The "CUSTOMER'S CURRENT CART" section is the AUTHORITATIVE current state. Read counts directly from the cart summary. Do not invent counts.
 
 ## PERSONALITY
@@ -200,10 +253,11 @@ export async function POST(request: Request) {
     const cartLine = body.cartSummary && body.cartSummary !== 'Empty'
       ? body.cartSummary
       : 'Empty - nothing ordered yet'
-    const menu = await loadMenu()
+    const [menu, customizations] = await Promise.all([loadMenu(), loadCustomizations()])
     const menuSection = buildMenuSection(menu)
     const bestsellerLine = buildBestsellerLine(menu)
-    const systemPrompt = `${SYSTEM_PROMPT_BASE}\n\n## MENU (internal reference — do not recite)\nItems are annotated with [tags] and ★BESTSELLER markers. Use tags to match customer intent.\n${menuSection}\n\n## BESTSELLERS\n${bestsellerLine}\n\n## CURRENT WEATHER\n${describeWeather(body.weather)}\n\n## CUSTOMER'S CURRENT CART\n${cartLine}`
+    const customizationSection = customizations ? buildCustomizationSection(customizations) : ''
+    const systemPrompt = `${SYSTEM_PROMPT_BASE}\n\n## MENU (internal reference — do not recite)\nItems are annotated with [tags] and ★BESTSELLER markers. Use tags to match customer intent.\n${menuSection}\n\n## BESTSELLERS\n${bestsellerLine}\n${customizationSection ? `\n${customizationSection}\n` : ''}\n## CURRENT WEATHER\n${describeWeather(body.weather)}\n\n## CUSTOMER'S CURRENT CART\n${cartLine}`
 
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',

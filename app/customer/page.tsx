@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useSession, signOut } from 'next-auth/react'
-import { MenuItem, OrderItem } from './types'
+import { MenuItem, OrderItem, ChatSelections } from './types'
 import { MENU_ITEMS } from '../data/menu'
 import ChatWidget from './ChatWidget'
 import QRLoginSection from '@/components/QRLoginSection'
@@ -105,8 +105,16 @@ export default function KioskPage() {
   const [drinkSize, setDrinkSize] = useState('Medium')
   const [drinkTemp, setDrinkTemp] = useState('Cold')
   const [iceLevel, setIceLevel] = useState('Normal Ice')
-  const [sugarLevel, setSugarLevel] = useState('100% Sugar')
+  const [sugarLevel, setSugarLevel] = useState('100% (Regular) Sweetness')
   const [bobaOption, setBobaOption] = useState('')
+  const [milkAlt, setMilkAlt] = useState('Whole Milk')
+  const [selectedToppings, setSelectedToppings] = useState<string[]>([])
+
+  const [quantity, setQuantity] = useState(1)
+
+  const [customizationsByCategory, setCustomizationsByCategory] = useState<{
+    [key: string]: Customization[]
+  }>({})
 
   // Add these with your other state declarations
   const [weather, setWeather] = useState<any>(null)
@@ -256,7 +264,39 @@ export default function KioskPage() {
         console.error('Error fetching items, using hardcoded fallback:', error)
       }
     }
+
+    async function fetchCustomizations() {
+      try {
+        const response = await fetch('/api/customizations')
+        if (!response.ok) return
+        const rows = await response.json()
+        if (!Array.isArray(rows) || rows.length === 0) return
+
+        const normalized: Customization[] = rows
+          .filter((r: any) => r.isactive !== false)
+          .map((r: any) => ({
+            customizationid: Number(r.customizationid),
+            name: String(r.name),
+            category: String(r.category),
+            price: Number(r.price),
+            ingredients: r.ingredients ?? undefined,
+            isactive: Boolean(r.isactive),
+          }))
+
+        const grouped: Record<string, Customization[]> = {}
+        for (const custom of normalized) {
+          if (!grouped[custom.category]) grouped[custom.category] = []
+          grouped[custom.category].push(custom)
+        }
+
+        setCustomizationsByCategory(grouped)
+      } catch (error) {
+        console.error('Error fetching customizations:', error)
+      }
+    }
+
     fetchItems()
+    fetchCustomizations()
   }, [])
 
   // Weather API
@@ -353,31 +393,58 @@ export default function KioskPage() {
     setDrinkSize('Medium')
     setDrinkTemp('Cold')
     setIceLevel('Normal Ice')
-    setSugarLevel('100% Sugar')
+    setSugarLevel('100% (Regular) Sweetness')
+    setMilkAlt('Whole Milk')
+    setSelectedToppings([])
     setBobaOption('')
+    setQuantity(1)
   }
 
   function confirmCustomization() {
     if (!customizingItem) return
     
-    const customParts = [drinkTemp, drinkSize, iceLevel, sugarLevel]
-    if (bobaOption) customParts.push(bobaOption)
-    const customString = customParts.join(', ')
+    // Calculate the total customized price
+    const baseCost = customizingItem.price
+    const sizeUpcharge = customizationsByCategory['Size']?.find(s => s.name === drinkSize)?.price ?? 0
+    const milkUpcharge = ['milk tea', 'fruit tea', 'specialty'].includes((customizingItem?.category || '').toLowerCase()) 
+      ? (customizationsByCategory['Milk']?.find(m => m.name === milkAlt)?.price ?? 0)
+      : 0
+    const toppingsCost = selectedToppings.reduce((sum, toppingName) => {
+      const topping = customizationsByCategory['Topping']?.find(t => t.name === toppingName)
+      return sum + (topping?.price ?? 0)
+    }, 0)
+    const bobaCost = bobaOption === 'Extra Boba' ? 1.00 : bobaOption === 'Regular Boba' ? 0.50 : 0
+    const totalPrice = baseCost + sizeUpcharge + milkUpcharge + toppingsCost + bobaCost
     
+    const toppingStr = selectedToppings.length > 0 ? selectedToppings.join(', ') : ''
+    const customParts = [drinkTemp, drinkSize, iceLevel, sugarLevel]
+    if (milkAlt && ['milk tea', 'fruit tea', 'specialty'].includes((customizingItem?.category || '').toLowerCase())) {
+      customParts.push(milkAlt)
+    }
+    if (toppingStr) customParts.push(toppingStr)
+    
+    if (bobaOption === 'Extra Boba') {
+      customParts.push('Regular Boba')
+      customParts.push('Extra Boba')
+    } else if (bobaOption) {
+      customParts.push(bobaOption)
+    }
+    
+    const customString = customParts.join(', ')
     const cartId = `${customizingItem.itemid}-${customString}`
 
     setCart(prev => {
       const existing = prev.find(o => o.cartId === cartId)
       if (existing) {
         return prev.map(o =>
-          o.cartId === cartId ? { ...o, qty: o.qty + 1 } : o
+          o.cartId === cartId ? { ...o, qty: o.qty + quantity } : o
         )
       }
       return [...prev, { 
         itemId: customizingItem.itemid, 
         itemName: customizingItem.itemname, 
-        price: customizingItem.price, 
-        qty: 1,
+        price: totalPrice,
+        qty: quantity,
         customizations: customString,
         cartId
       }]
@@ -388,11 +455,75 @@ export default function KioskPage() {
     setCustomizingItem(null)
   }
 
-  const DEFAULT_CUSTOM_STRING = 'Medium, Normal Ice, 100% Sugar, Regular Boba'
+  function getDefaultChatSelections(item: MenuItem): ChatSelections {
+    // Match the modal's hardcoded initial-state literals so chat-added defaults
+    // and modal-added defaults produce the same customString and merge in cart.
+    const cat = (item.category || '').toLowerCase()
+    const isMilkEligible = ['milk tea', 'fruit tea', 'specialty'].includes(cat)
+    return {
+      size: 'Medium',
+      temperature: 'Cold',
+      ice: 'Normal Ice',
+      sweetness: '100% (Regular) Sweetness',
+      milk: isMilkEligible ? 'Whole Milk' : undefined,
+      toppings: [],
+      boba: isMilkEligible ? 'Regular Boba' : '',
+    }
+  }
 
-  function addToCartFromChat(item: MenuItem): string {
-    const customString = DEFAULT_CUSTOM_STRING
+  function buildChatCustomization(item: MenuItem, sel: ChatSelections): { customString: string; totalPrice: number; cartId: string } {
+    const cat = (item.category || '').toLowerCase()
+    const isMilkEligible = ['milk tea', 'fruit tea', 'specialty'].includes(cat)
+    const c = customizationsByCategory
+
+    const effectiveToppings = isMilkEligible ? (sel.toppings ?? []) : []
+    const effectiveBoba = isMilkEligible ? sel.boba : ''
+
+    const sizeUpcharge = c['Size']?.find(o => o.name === sel.size)?.price ?? 0
+    const milkUpcharge = isMilkEligible && sel.milk
+      ? (c['Milk']?.find(o => o.name === sel.milk)?.price ?? 0)
+      : 0
+    const toppingsCost = effectiveToppings.reduce((sum, name) => {
+      return sum + (c['Topping']?.find(o => o.name === name)?.price ?? 0)
+    }, 0)
+    const bobaCost = effectiveBoba === 'Extra Boba' ? 1.00 : effectiveBoba === 'Regular Boba' ? 0.50 : 0
+    const totalPrice = item.price + sizeUpcharge + milkUpcharge + toppingsCost + bobaCost
+
+    const parts: string[] = []
+    if (sel.temperature) parts.push(sel.temperature)
+    if (sel.size) parts.push(sel.size)
+    if (sel.ice) parts.push(sel.ice)
+    if (sel.sweetness) parts.push(sel.sweetness)
+    if (isMilkEligible && sel.milk) parts.push(sel.milk)
+    if (effectiveToppings.length) parts.push(effectiveToppings.join(', '))
+    if (effectiveBoba === 'Extra Boba') {
+      parts.push('Regular Boba')
+      parts.push('Extra Boba')
+    } else if (effectiveBoba) {
+      parts.push(effectiveBoba)
+    }
+    const customString = parts.join(', ')
     const cartId = `${item.itemid}-${customString}`
+    return { customString, totalPrice, cartId }
+  }
+
+  function addToCartFromChat(item: MenuItem, selections?: ChatSelections): string {
+    if ((item.category || '').toLowerCase().includes('snack')) {
+      const cartId = `${item.itemid}-no-customization`
+      setCart(prev => {
+        const existing = prev.find(o => o.cartId === cartId)
+        if (existing) {
+          return prev.map(o => (o.cartId === cartId ? { ...o, qty: o.qty + 1 } : o))
+        }
+        return [...prev, { itemId: item.itemid, itemName: item.itemname, price: item.price, qty: 1, cartId }]
+      })
+      setAddedNotification(item.itemname)
+      setTimeout(() => setAddedNotification(null), 2000)
+      return cartId
+    }
+
+    const sel = selections ?? getDefaultChatSelections(item)
+    const { customString, totalPrice, cartId } = buildChatCustomization(item, sel)
     setCart(prev => {
       const existing = prev.find(o => o.cartId === cartId)
       if (existing) {
@@ -403,7 +534,7 @@ export default function KioskPage() {
         {
           itemId: item.itemid,
           itemName: item.itemname,
-          price: item.price,
+          price: totalPrice,
           qty: 1,
           customizations: customString,
           cartId,
@@ -415,13 +546,14 @@ export default function KioskPage() {
     return cartId
   }
 
-  function modifyChatCartLine(oldCartId: string, newCustomString: string): string | null {
-    let newCartId: string | null = null
+  function modifyChatCartLine(oldCartId: string, item: MenuItem, selections: ChatSelections): string | null {
+    const { customString, totalPrice, cartId: newCartId } = buildChatCustomization(item, selections)
+    if (newCartId === oldCartId) return oldCartId
+    let resultId: string | null = null
     setCart(prev => {
       const line = prev.find(o => o.cartId === oldCartId)
       if (!line) return prev
-      newCartId = `${line.itemId}-${newCustomString}`
-      if (newCartId === oldCartId) return prev
+      resultId = newCartId
       const withoutOld = prev.filter(o => o.cartId !== oldCartId)
       const existing = withoutOld.find(o => o.cartId === newCartId)
       if (existing) {
@@ -431,10 +563,10 @@ export default function KioskPage() {
       }
       return [
         ...withoutOld,
-        { ...line, customizations: newCustomString, cartId: newCartId },
+        { ...line, price: totalPrice, customizations: customString, cartId: newCartId },
       ]
     })
-    return newCartId
+    return resultId
   }
 
   function incrementCart(cartId: string) {
@@ -500,6 +632,7 @@ export default function KioskPage() {
         menuItems={items}
         cart={cart}
         weather={weather}
+        customizationsByCategory={customizationsByCategory}
         onAddToCart={addToCartFromChat}
         onModifyCartLine={modifyChatCartLine}
         onSelectCategory={setSelectedCategory}
@@ -551,119 +684,260 @@ export default function KioskPage() {
       {/* Customization Modal */}
       {customizingItem && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm">
-          <div className="rounded-2xl p-6 w-96 shadow-xl border-2" style={{
+          <div className="rounded-2xl p-8 w-[750px] shadow-xl border-2 overflow-y-auto max-h-[90vh]" style={{
             backgroundColor: 'var(--bg-primary)',
             borderColor: 'var(--card-border)',
             color: 'var(--card-text)'
           }}>
-            <h2 className="text-2xl font-bold mb-2">{customizingItem.itemname}</h2>
-            <p className="mb-6" style={{ color: 'var(--text-muted)' }}>Customize your drink</p>
+            <div className="flex items-baseline gap-3 mb-6">
+              <h2 className="text-2xl font-bold">{customizingItem.itemname}</h2>
+              <p style={{ color: 'var(--text-muted)' }}>Customize your drink</p>
+            </div>
             
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold mb-2">Drink Size</label>
-                <select 
-                  value={drinkSize} 
-                  onChange={(e) => setDrinkSize(e.target.value)}
-                  className="w-full p-3 rounded-lg border" 
-                  style={{
-                    backgroundColor: 'var(--input-bg)',
-                    borderColor: 'var(--input-border)',
-                    color: 'var(--input-text)'
-                  }}
-                >
-                  <option>Medium</option>
-                  <option>Large</option>
-                </select>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold mb-3">Drink Size</label>
+                  <select 
+                    value={drinkSize} 
+                    onChange={(e) => setDrinkSize(e.target.value)}
+                    className="w-full p-3 rounded-lg border text-sm" 
+                    style={{
+                      backgroundColor: 'var(--input-bg)',
+                      borderColor: 'var(--input-border)',
+                      color: 'var(--input-text)'
+                    }}
+                  >
+                    {customizationsByCategory['Size']?.map(opt => (
+                      <option key={opt.customizationid} value={opt.name}>
+                        {opt.name}{opt.price > 0 ? ` (+$${opt.price.toFixed(2)})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {!['refresher', 'slush'].includes((customizingItem?.category || '').toLowerCase()) && (
+                  <div>
+                    <label className="block text-sm font-semibold mb-3">Temperature</label>
+                    <select 
+                      value={drinkTemp} 
+                      onChange={(e) => setDrinkTemp(e.target.value)}
+                      className="w-full p-3 rounded-lg border text-sm"
+                      style={{
+                        backgroundColor: 'var(--input-bg)',
+                        borderColor: 'var(--input-border)',
+                        color: 'var(--input-text)'
+                      }}
+                    >
+                      {customizationsByCategory['Temperature']?.map(opt => (
+                        <option key={opt.customizationid} value={opt.name}>
+                          {opt.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-semibold mb-3">Ice Level</label>
+                  <select 
+                    value={iceLevel} 
+                    onChange={(e) => setIceLevel(e.target.value)}
+                    className="w-full p-3 rounded-lg border text-sm"
+                    style={{
+                      backgroundColor: 'var(--input-bg)',
+                      borderColor: 'var(--input-border)',
+                      color: 'var(--input-text)'
+                    }}
+                  >
+                    {customizationsByCategory['Ice']?.map(opt => (
+                      <option key={opt.customizationid} value={opt.name}>
+                        {opt.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-semibold mb-2">Temperature</label>
-                <select 
-                  value={drinkTemp} 
-                  onChange={(e) => setDrinkTemp(e.target. value)}
-                  className="w-full p-3 rounded-lg border"
-                  style={{
-                    backgroundColor: 'var(--input-bg)',
-                    borderColor: 'var(--input-border)',
-                    color: 'var(--input-text)'
-                  }}
-                >
-                  <option>Hot</option>
-                  <option>Cold</option>
-                </select>
-              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold mb-3">Sugar Level</label>
+                  <select 
+                    value={sugarLevel} 
+                    onChange={(e) => setSugarLevel(e.target.value)}
+                    className="w-full p-3 rounded-lg border text-sm"
+                    style={{
+                      backgroundColor: 'var(--input-bg)',
+                      borderColor: 'var(--input-border)',
+                      color: 'var(--input-text)'
+                    }}
+                  >
+                    {customizationsByCategory['Sweetness']?.sort((a, b) => {
+                      const orderMap: { [key: string]: number } = { '0% Sweetness': 0, '20% Sweetness': 1, '50% Sweetness': 2, '100% (Regular) Sweetness': 3, '120% Sweetness': 4 };
+                      return (orderMap[a.name] ?? 999) - (orderMap[b.name] ?? 999);
+                    }).map(opt => (
+                      <option key={opt.customizationid} value={opt.name}>
+                        {opt.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-              <div>
-                <label className="block text-sm font-semibold mb-2">Ice Level</label>
-                <select 
-                  value={iceLevel} 
-                  onChange={(e) => setIceLevel(e.target.value)}
-                  className="w-full p-3 rounded-lg border"
-                  style={{
-                    backgroundColor: 'var(--input-bg)',
-                    borderColor: 'var(--input-border)',
-                    color: 'var(--input-text)'
-                  }}
-                >
-                  <option>Normal Ice</option>
-                  <option>Extra Ice</option>
-                  <option>Less Ice</option>
-                  <option>No Ice</option>
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-semibold mb-2">Sugar Level</label>
-                <select 
-                  value={sugarLevel} 
-                  onChange={(e) => setSugarLevel(e.target.value)}
-                  className="w-full p-3 rounded-lg border"
-                  style={{
-                    backgroundColor: 'var(--input-bg)',
-                    borderColor: 'var(--input-border)',
-                    color: 'var(--input-text)'
-                  }}
-                >
-                  <option>120% Sugar</option>
-                  <option>100% Sugar</option>
-                  <option>75% Sugar</option>
-                  <option>50% Sugar</option>
-                  <option>25% Sugar</option>
-                  <option>0% Sugar</option>
-                </select>
+                {['milk tea', 'fruit tea', 'specialty'].includes((customizingItem?.category || '').toLowerCase()) && (
+                  <div>
+                    <label className="block text-sm font-semibold mb-3">Milk</label>
+                    <select 
+                      value={milkAlt} 
+                      onChange={(e) => setMilkAlt(e.target.value)}
+                      className="w-full p-3 rounded-lg border text-sm"
+                      style={{
+                        backgroundColor: 'var(--input-bg)',
+                        borderColor: 'var(--input-border)',
+                        color: 'var(--input-text)'
+                      }}
+                    >
+                      {customizationsByCategory['Milk']?.map(opt => (
+                        <option key={opt.customizationid} value={opt.name}>
+                          {opt.name}{opt.price > 0 ? ` (+$${opt.price.toFixed(2)})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
 
               {['milk tea', 'fruit tea', 'specialty'].includes((customizingItem?.category || '').toLowerCase()) && (
-                <div>
-                  <label className="block text-sm font-semibold mb-2">Boba</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { value: 'Regular Boba' as const, emoji: '🧋', label: 'Regular' },
-                      { value: 'Extra Boba' as const, emoji: '🧋+', label: 'Extra' },
-                      { value: 'No Boba' as const, emoji: '🚫🧋', label: 'None' },
-                    ].map(option => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        aria-pressed={bobaOption === option.value}
-                        onClick={() => setBobaOption(option.value)}
-                        className="rounded-lg border p-3 flex flex-col items-center justify-center transition-colors"
-                        style={{
-                          borderColor: bobaOption === option.value ? 'var(--accent-color)' : 'var(--card-border)',
-                          backgroundColor: bobaOption === option.value ? 'var(--accent-color)' : 'var(--card-bg)',
-                          color: bobaOption === option.value ? '#ffffff' : 'var(--card-text)'
-                        }}
-                      >
-                        <span className="text-xl">{option.emoji}</span>
-                        <span className="text-xs mt-1 font-medium">{option.label}</span>
-                      </button>
-                    ))}
+                <>
+                  <div>
+                    <label className="block text-sm font-semibold mb-3">Toppings</label>
+                    <div className="grid grid-cols-3 gap-3">
+                      {customizationsByCategory['Topping']?.filter(topping => 
+                        topping.name !== 'Tapioca Pearls (Boba)' && topping.name !== 'Extra Boba'
+                      ).map(topping => (
+                        <button
+                          key={topping.customizationid}
+                          type="button"
+                          onClick={() => {
+                            setSelectedToppings(prev =>
+                              prev.includes(topping.name)
+                                ? prev.filter(t => t !== topping.name)
+                                : [...prev, topping.name]
+                            )
+                          }}
+                          className="rounded-lg border p-2 text-sm font-medium transition-colors"
+                          style={{
+                            borderColor: selectedToppings.includes(topping.name) ? 'var(--accent-color)' : 'var(--card-border)',
+                            backgroundColor: selectedToppings.includes(topping.name) ? 'var(--accent-color)' : 'var(--card-bg)',
+                            color: selectedToppings.includes(topping.name) ? '#ffffff' : 'var(--card-text)'
+                          }}
+                        >
+                          <div className="flex flex-col items-center justify-center">
+                            <span
+                              className="text-sm"
+                              style={{
+                                color: selectedToppings.includes(topping.name) ? '#ffffff' : 'var(--card-text)',
+                                fontWeight: selectedToppings.includes(topping.name) ? '600' : '500'
+                              }}
+                            >
+                              {topping.name}
+                            </span>
+                            {topping.price > 0 && (
+                              <span
+                                className="text-xs mt-0.5"
+                                style={{
+                                  opacity: selectedToppings.includes(topping.name) ? 0.95 : 0.75,
+                                  color: selectedToppings.includes(topping.name) ? '#ffffff' : 'var(--card-text)'
+                                }}
+                              >
+                                +${topping.price.toFixed(2)}
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold mb-3">Boba</label>
+                    <div className="grid grid-cols-3 gap-4">
+                      {[
+                        { value: 'Regular Boba' as const, emoji: '🧋', label: 'Regular', price: 0.50 },
+                        { value: 'Extra Boba' as const, emoji: '🧋+', label: 'Extra', price: 1.00 },
+                        { value: 'No Boba' as const, emoji: '🚫🧋', label: 'None', price: 0.00 },
+                      ].map(option => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          aria-pressed={bobaOption === option.value}
+                          onClick={() => setBobaOption(option.value)}
+                          className="rounded-lg border p-2 flex flex-col items-center justify-center transition-colors"
+                          style={{
+                            borderColor: bobaOption === option.value ? 'var(--accent-color)' : 'var(--card-border)',
+                            backgroundColor: bobaOption === option.value ? 'var(--accent-color)' : 'var(--card-bg)',
+                            color: bobaOption === option.value ? '#ffffff' : 'var(--card-text)'
+                          }}
+                        >
+                          <span className="text-lg">{option.emoji}</span>
+                          <span 
+                            className="text-xs mt-1 font-medium"
+                            style={{
+                              color: bobaOption === option.value ? '#ffffff' : 'var(--card-text)',
+                              fontWeight: bobaOption === option.value ? '600' : '500'
+                            }}
+                          >
+                            {option.label}
+                          </span>
+                          {option.price > 0 && (
+                            <span 
+                              className="text-xs mt-0.5"
+                              style={{
+                                opacity: bobaOption === option.value ? 0.95 : 0.75,
+                                color: bobaOption === option.value ? '#ffffff' : 'var(--card-text)'
+                              }}
+                            >
+                              +${option.price.toFixed(2)}
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
               )}
             </div>
-
+              
+            <div className="mt-8 border-t pt-6 flex flex-col items-center" style={{ borderColor: 'var(--card-border)' }}>
+              <label className="block text-sm font-semibold mb-3 text-center">Quantity</label>
+              <div className="flex flex-col items-center gap-2">
+                <div className="flex items-center border-2 rounded-xl overflow-hidden" style={{ borderColor: 'var(--card-border)', backgroundColor: 'var(--card-bg)' }}>
+                  <button
+                    type="button"
+                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    className="w-14 h-12 flex items-center justify-center text-2xl font-bold hover:opacity-80 transition-opacity"
+                    style={{ color: 'var(--accent-color)' }}
+                  >
+                    −
+                  </button>
+                  <div
+                    className="w-16 h-12 flex items-center justify-center font-bold text-xl border-x-2"
+                    style={{ borderColor: 'var(--card-border)', backgroundColor: 'var(--input-bg)' }}
+                  >
+                    {quantity}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setQuantity(quantity + 1)}
+                    className="w-14 h-12 flex items-center justify-center text-2xl font-bold hover:opacity-80 transition-opacity"
+                    style={{ color: 'var(--accent-color)' }}
+                  >
+                    +
+                  </button>
+                </div>
+              
+              </div>
+            </div>
+            
             <div className="mt-8 flex gap-3">
               <button 
                 onClick={() => setCustomizingItem(null)}
@@ -683,7 +957,23 @@ export default function KioskPage() {
                   color: 'var(--button-primary-text)'
                 }}
               >
-                Add to Cart
+                {(() => {
+                  const baseCost = customizingItem?.price ?? 0
+                  const sizeUpcharge = customizationsByCategory['Size']?.find(s => s.name === drinkSize)?.price ?? 0
+                  const milkUpcharge = ['milk tea', 'fruit tea', 'specialty'].includes((customizingItem?.category || '').toLowerCase()) 
+                    ? (customizationsByCategory['Milk']?.find(m => m.name === milkAlt)?.price ?? 0)
+                    : 0
+                  const toppingsCost = selectedToppings.reduce((sum, toppingName) => {
+                    const topping = customizationsByCategory['Topping']?.find(t => t.name === toppingName)
+                    return sum + (topping?.price ?? 0)
+                  }, 0)
+                  const bobaCost = bobaOption === 'Extra Boba' ? 1.00 : bobaOption === 'Regular Boba' ? 0.50 : 0
+                  
+                  const totalPrice = baseCost + sizeUpcharge + milkUpcharge + toppingsCost + bobaCost
+                  const finalPrice = totalPrice * quantity
+
+                  return `Add ${quantity > 1 ? quantity + ' items' : 'to Cart'} — $${finalPrice.toFixed(2)}`
+                })()}
               </button>
             </div>
           </div>
@@ -1109,4 +1399,13 @@ export default function KioskPage() {
       )}
     </div>
   );
+}
+
+interface Customization {
+  customizationid: number
+  name: string
+  category: string
+  price: number
+  ingredients?: string
+  isactive: boolean
 }

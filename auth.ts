@@ -27,6 +27,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
       },
     }),
+    Credentials({
+      id: "demo-pin",
+      credentials: {
+        pin: { type: "password" },
+      },
+      async authorize(credentials) {
+        const pin = credentials?.pin as string | undefined
+        if (!pin || pin !== "1234") return null
+        return {
+          id: "bob",
+          name: "Bob",
+          email: "bob@aggtea.com",
+        }
+      },
+    }),
   ],
   pages: {
     signIn: "/login",

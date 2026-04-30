@@ -1,13 +1,22 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { MenuItem, OrderItem } from './types'
+import { MenuItem, OrderItem, ChatSelections, ChatBobaOption, ChatCustomization } from './types'
 
+// Bot-facing update shape. Keys mirror ChatSelections plus a legacy `sugar`
+// alias so older prompt outputs still apply. `addTopping`/`removeTopping`
+// let the bot do delta changes without knowing the current full list.
 type CustomizationUpdate = {
-  size?: 'Medium' | 'Large'
-  ice?: 'Normal Ice' | 'Less Ice' | 'No Ice'
-  sugar?: '100% Sugar' | '75% Sugar' | '50% Sugar' | '25% Sugar' | '0% Sugar'
-  boba?: 'Regular Boba' | 'Extra Boba' | 'No Boba'
+  size?: string
+  temperature?: string
+  ice?: string
+  sweetness?: string
+  sugar?: string
+  milk?: string
+  toppings?: string[]
+  addTopping?: string
+  removeTopping?: string
+  boba?: ChatBobaOption
 }
 
 type ChatButton =
@@ -33,8 +42,9 @@ interface ChatWidgetProps {
   menuItems: MenuItem[]
   cart: OrderItem[]
   weather?: any
-  onAddToCart: (item: MenuItem) => string
-  onModifyCartLine: (oldCartId: string, newCustomString: string) => string | null
+  customizationsByCategory?: Record<string, ChatCustomization[]>
+  onAddToCart: (item: MenuItem, selections?: ChatSelections) => string
+  onModifyCartLine: (oldCartId: string, item: MenuItem, selections: ChatSelections) => string | null
   onSelectCategory: (category: string) => void
   onRequestClose?: () => void
   textSize?: string
@@ -43,19 +53,67 @@ interface ChatWidgetProps {
 
 type LastAdded = {
   cartId: string
+  itemId: number
   itemName: string
-  size: 'Medium' | 'Large'
-  ice: 'Normal Ice' | 'Less Ice' | 'No Ice'
-  sugar: '100% Sugar' | '75% Sugar' | '50% Sugar' | '25% Sugar' | '0% Sugar'
-  boba: 'Regular Boba' | 'Extra Boba' | 'No Boba'
+  drinkCategory: string
+  selections: ChatSelections
 }
 
-function formatCustomization(c: Pick<LastAdded, 'size' | 'ice' | 'sugar' | 'boba'>): string {
-  return `${c.size}, ${c.ice}, ${c.sugar}, ${c.boba}`
+function defaultSelectionsFor(
+  item: MenuItem,
+  _c: Record<string, ChatCustomization[]>
+): ChatSelections {
+  // Match the modal's hardcoded initial-state literals so chat-added defaults
+  // and modal-added defaults produce the same customString and merge in cart.
+  const cat = (item.category || '').toLowerCase()
+  const isMilkEligible = ['milk tea', 'fruit tea', 'specialty'].includes(cat)
+  return {
+    size: 'Medium',
+    temperature: 'Cold',
+    ice: 'Normal Ice',
+    sweetness: '100% (Regular) Sweetness',
+    milk: isMilkEligible ? 'Whole Milk' : undefined,
+    toppings: [],
+    boba: isMilkEligible ? 'Regular Boba' : '',
+  }
 }
 
-export default function ChatWidget({ menuItems, cart, weather, onAddToCart, onModifyCartLine, onSelectCategory, onRequestClose, textSize, highContrast }: ChatWidgetProps) {
+function applyUpdate(prev: ChatSelections, update: CustomizationUpdate): ChatSelections {
+  const next: ChatSelections = { ...prev }
+  if (update.size !== undefined) next.size = update.size
+  if (update.temperature !== undefined) next.temperature = update.temperature
+  if (update.ice !== undefined) next.ice = update.ice
+  // Accept either the new "sweetness" key or the legacy "sugar" alias.
+  if (update.sweetness !== undefined) next.sweetness = update.sweetness
+  else if (update.sugar !== undefined) next.sweetness = update.sugar
+  if (update.milk !== undefined) next.milk = update.milk
+  if (update.toppings !== undefined) next.toppings = update.toppings
+  if (update.addTopping) {
+    const cur = next.toppings ?? []
+    if (!cur.includes(update.addTopping)) next.toppings = [...cur, update.addTopping]
+  }
+  if (update.removeTopping) {
+    next.toppings = (next.toppings ?? []).filter(t => t !== update.removeTopping)
+  }
+  if (update.boba !== undefined) next.boba = update.boba
+  return next
+}
+
+export default function ChatWidget({ menuItems, cart, weather, customizationsByCategory, onAddToCart, onModifyCartLine, onSelectCategory, onRequestClose, textSize, highContrast }: ChatWidgetProps) {
+  const customizations = customizationsByCategory ?? {}
   const [lastAdded, setLastAdded] = useState<LastAdded | null>(null)
+  const lastAddedRef = useRef<LastAdded | null>(null)
+  useEffect(() => {
+    lastAddedRef.current = lastAdded
+  }, [lastAdded])
+
+  function selectionsForAdd(item: MenuItem): ChatSelections {
+    const prev = lastAddedRef.current
+    if (prev && prev.itemId === item.itemid) {
+      return { ...prev.selections, toppings: [...(prev.selections.toppings ?? [])] }
+    }
+    return defaultSelectionsFor(item, customizations)
+  }
   const [isListening, setIsListening] = useState(false)
   const [speechSupported, setSpeechSupported] = useState(false)
   const recognitionRef = useRef<any>(null)
@@ -205,15 +263,25 @@ export default function ChatWidget({ menuItems, cart, weather, onAddToCart, onMo
           if (action.type === 'add') {
             const match = menuItems.find(i => i.itemid === action.itemId)
             if (match) {
-              const newCartId = onAddToCart(match)
+              const sel = selectionsForAdd(match)
+              const newCartId = onAddToCart(match, sel)
               setLastAdded({
                 cartId: newCartId,
+                itemId: match.itemid,
                 itemName: match.itemname,
-                size: 'Medium',
-                ice: 'Normal Ice',
-                sugar: '100% Sugar',
-                boba: 'Regular Boba',
+                drinkCategory: match.category,
+                selections: sel,
               })
+            }
+          } else if (action.type === 'modify') {
+            const prev = lastAddedRef.current
+            if (!prev) continue
+            const item = menuItems.find(i => i.itemid === prev.itemId)
+            if (!item) continue
+            const newSelections = applyUpdate(prev.selections, action.update ?? {})
+            const newCartId = onModifyCartLine(prev.cartId, item, newSelections)
+            if (newCartId) {
+              setLastAdded({ ...prev, cartId: newCartId, selections: newSelections })
             }
           }
         }
@@ -255,14 +323,14 @@ export default function ChatWidget({ menuItems, cart, weather, onAddToCart, onMo
     if (button.action === 'add_item') {
       const match = menuItems.find(i => i.itemid === button.itemId)
       if (!match) return
-      const newCartId = onAddToCart(match)
+      const sel = selectionsForAdd(match)
+      const newCartId = onAddToCart(match, sel)
       setLastAdded({
         cartId: newCartId,
+        itemId: match.itemid,
         itemName: match.itemname,
-        size: 'Medium',
-        ice: 'Normal Ice',
-        sugar: '100% Sugar',
-        boba: 'Regular Boba',
+        drinkCategory: match.category,
+        selections: sel,
       })
       const next: ChatMessage[] = [
         ...messages,
@@ -276,26 +344,22 @@ export default function ChatWidget({ menuItems, cart, weather, onAddToCart, onMo
           itemName: match.itemname,
           price: match.price,
           qty: 1,
-          customizations: 'Medium, Normal Ice, 100% Sugar, Regular Boba',
+          customizations: '',
           cartId: `chat-${match.itemid}`,
         },
       ]
       sendToApi(next, { skipCartActions: true, cartOverride: projected })
     } else if (button.action === 'modify_item') {
       if (!lastAdded) return
-      const updated = {
-        size: button.update.size ?? lastAdded.size,
-        ice: button.update.ice ?? lastAdded.ice,
-        sugar: button.update.sugar ?? lastAdded.sugar,
-        boba: button.update.boba ?? lastAdded.boba,
-      }
-      const newCustomString = formatCustomization(updated)
-      const newCartId = onModifyCartLine(lastAdded.cartId, newCustomString)
+      const item = menuItems.find(i => i.itemid === lastAdded.itemId)
+      if (!item) return
+      const newSelections = applyUpdate(lastAdded.selections, button.update)
+      const newCartId = onModifyCartLine(lastAdded.cartId, item, newSelections)
       if (!newCartId) return
       setLastAdded({
+        ...lastAdded,
         cartId: newCartId,
-        itemName: lastAdded.itemName,
-        ...updated,
+        selections: newSelections,
       })
       const next: ChatMessage[] = [
         ...messages,
