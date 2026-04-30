@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useSession, signOut } from 'next-auth/react'
-import { MenuItem, OrderItem } from './types'
+import { MenuItem, OrderItem, ChatSelections } from './types'
 import { MENU_ITEMS } from '../data/menu'
 import ChatWidget from './ChatWidget'
 import QRLoginSection from '@/components/QRLoginSection'
@@ -452,11 +452,79 @@ export default function KioskPage() {
     setCustomizingItem(null)
   }
 
-  const DEFAULT_CUSTOM_STRING = 'Medium, Normal Ice, 100% Sugar, Regular Boba'
+  function getDefaultChatSelections(item: MenuItem): ChatSelections {
+    const cat = (item.category || '').toLowerCase()
+    const isMilkEligible = ['milk tea', 'fruit tea', 'specialty'].includes(cat)
+    const c = customizationsByCategory
+    const pickName = (catKey: string, preferred?: string) => {
+      const opts = c[catKey] ?? []
+      if (preferred) {
+        const hit = opts.find(o => o.name === preferred)
+        if (hit) return hit.name
+      }
+      return opts[0]?.name
+    }
+    return {
+      size: pickName('Size', 'Medium') ?? 'Medium',
+      temperature: pickName('Temperature', 'Cold') ?? 'Cold',
+      ice: pickName('Ice', 'Normal Ice') ?? 'Normal Ice',
+      sweetness: pickName('Sweetness', '100% (Regular) Sweetness') ?? '100% (Regular) Sweetness',
+      milk: isMilkEligible ? (pickName('Milk', 'Whole Milk') ?? 'Whole Milk') : undefined,
+      toppings: [],
+      boba: isMilkEligible ? 'Regular Boba' : '',
+    }
+  }
 
-  function addToCartFromChat(item: MenuItem): string {
-    const customString = DEFAULT_CUSTOM_STRING
+  function buildChatCustomization(item: MenuItem, sel: ChatSelections): { customString: string; totalPrice: number; cartId: string } {
+    const cat = (item.category || '').toLowerCase()
+    const isMilkEligible = ['milk tea', 'fruit tea', 'specialty'].includes(cat)
+    const c = customizationsByCategory
+
+    const sizeUpcharge = c['Size']?.find(o => o.name === sel.size)?.price ?? 0
+    const milkUpcharge = isMilkEligible && sel.milk
+      ? (c['Milk']?.find(o => o.name === sel.milk)?.price ?? 0)
+      : 0
+    const toppingsCost = (sel.toppings ?? []).reduce((sum, name) => {
+      return sum + (c['Topping']?.find(o => o.name === name)?.price ?? 0)
+    }, 0)
+    const bobaCost = sel.boba === 'Extra Boba' ? 1.00 : sel.boba === 'Regular Boba' ? 0.50 : 0
+    const totalPrice = item.price + sizeUpcharge + milkUpcharge + toppingsCost + bobaCost
+
+    const parts: string[] = []
+    if (sel.temperature) parts.push(sel.temperature)
+    if (sel.size) parts.push(sel.size)
+    if (sel.ice) parts.push(sel.ice)
+    if (sel.sweetness) parts.push(sel.sweetness)
+    if (isMilkEligible && sel.milk) parts.push(sel.milk)
+    if (sel.toppings && sel.toppings.length) parts.push(sel.toppings.join(', '))
+    if (sel.boba === 'Extra Boba') {
+      parts.push('Regular Boba')
+      parts.push('Extra Boba')
+    } else if (sel.boba) {
+      parts.push(sel.boba)
+    }
+    const customString = parts.join(', ')
     const cartId = `${item.itemid}-${customString}`
+    return { customString, totalPrice, cartId }
+  }
+
+  function addToCartFromChat(item: MenuItem, selections?: ChatSelections): string {
+    if ((item.category || '').toLowerCase().includes('snack')) {
+      const cartId = `${item.itemid}-no-customization`
+      setCart(prev => {
+        const existing = prev.find(o => o.cartId === cartId)
+        if (existing) {
+          return prev.map(o => (o.cartId === cartId ? { ...o, qty: o.qty + 1 } : o))
+        }
+        return [...prev, { itemId: item.itemid, itemName: item.itemname, price: item.price, qty: 1, cartId }]
+      })
+      setAddedNotification(item.itemname)
+      setTimeout(() => setAddedNotification(null), 2000)
+      return cartId
+    }
+
+    const sel = selections ?? getDefaultChatSelections(item)
+    const { customString, totalPrice, cartId } = buildChatCustomization(item, sel)
     setCart(prev => {
       const existing = prev.find(o => o.cartId === cartId)
       if (existing) {
@@ -467,7 +535,7 @@ export default function KioskPage() {
         {
           itemId: item.itemid,
           itemName: item.itemname,
-          price: item.price,
+          price: totalPrice,
           qty: 1,
           customizations: customString,
           cartId,
@@ -479,13 +547,14 @@ export default function KioskPage() {
     return cartId
   }
 
-  function modifyChatCartLine(oldCartId: string, newCustomString: string): string | null {
-    let newCartId: string | null = null
+  function modifyChatCartLine(oldCartId: string, item: MenuItem, selections: ChatSelections): string | null {
+    const { customString, totalPrice, cartId: newCartId } = buildChatCustomization(item, selections)
+    if (newCartId === oldCartId) return oldCartId
+    let resultId: string | null = null
     setCart(prev => {
       const line = prev.find(o => o.cartId === oldCartId)
       if (!line) return prev
-      newCartId = `${line.itemId}-${newCustomString}`
-      if (newCartId === oldCartId) return prev
+      resultId = newCartId
       const withoutOld = prev.filter(o => o.cartId !== oldCartId)
       const existing = withoutOld.find(o => o.cartId === newCartId)
       if (existing) {
@@ -495,10 +564,10 @@ export default function KioskPage() {
       }
       return [
         ...withoutOld,
-        { ...line, customizations: newCustomString, cartId: newCartId },
+        { ...line, price: totalPrice, customizations: customString, cartId: newCartId },
       ]
     })
-    return newCartId
+    return resultId
   }
 
   function incrementCart(cartId: string) {
@@ -564,6 +633,7 @@ export default function KioskPage() {
         menuItems={items}
         cart={cart}
         weather={weather}
+        customizationsByCategory={customizationsByCategory}
         onAddToCart={addToCartFromChat}
         onModifyCartLine={modifyChatCartLine}
         onSelectCategory={setSelectedCategory}
