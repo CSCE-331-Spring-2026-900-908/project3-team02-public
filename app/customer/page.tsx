@@ -110,6 +110,8 @@ export default function KioskPage() {
   const [milkAlt, setMilkAlt] = useState('Whole Milk')
   const [selectedToppings, setSelectedToppings] = useState<string[]>([])
 
+  const [quantity, setQuantity] = useState(1)
+
   const [customizationsByCategory, setCustomizationsByCategory] = useState<{
     [key: string]: Customization[]
   }>({})
@@ -395,6 +397,7 @@ export default function KioskPage() {
     setMilkAlt('Whole Milk')
     setSelectedToppings([])
     setBobaOption('')
+    setQuantity(1)
   }
 
   function confirmCustomization() {
@@ -434,14 +437,14 @@ export default function KioskPage() {
       const existing = prev.find(o => o.cartId === cartId)
       if (existing) {
         return prev.map(o =>
-          o.cartId === cartId ? { ...o, qty: o.qty + 1 } : o
+          o.cartId === cartId ? { ...o, qty: o.qty + quantity } : o
         )
       }
       return [...prev, { 
         itemId: customizingItem.itemid, 
         itemName: customizingItem.itemname, 
         price: totalPrice,
-        qty: 1,
+        qty: quantity,
         customizations: customString,
         cartId
       }]
@@ -903,7 +906,38 @@ export default function KioskPage() {
                 </>
               )}
             </div>
-
+              
+            <div className="mt-8 border-t pt-6 flex flex-col items-center" style={{ borderColor: 'var(--card-border)' }}>
+              <label className="block text-sm font-semibold mb-3 text-center">Quantity</label>
+              <div className="flex flex-col items-center gap-2">
+                <div className="flex items-center border-2 rounded-xl overflow-hidden" style={{ borderColor: 'var(--card-border)', backgroundColor: 'var(--card-bg)' }}>
+                  <button
+                    type="button"
+                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    className="w-14 h-12 flex items-center justify-center text-2xl font-bold hover:opacity-80 transition-opacity"
+                    style={{ color: 'var(--accent-color)' }}
+                  >
+                    −
+                  </button>
+                  <div
+                    className="w-16 h-12 flex items-center justify-center font-bold text-xl border-x-2"
+                    style={{ borderColor: 'var(--card-border)', backgroundColor: 'var(--input-bg)' }}
+                  >
+                    {quantity}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setQuantity(quantity + 1)}
+                    className="w-14 h-12 flex items-center justify-center text-2xl font-bold hover:opacity-80 transition-opacity"
+                    style={{ color: 'var(--accent-color)' }}
+                  >
+                    +
+                  </button>
+                </div>
+              
+              </div>
+            </div>
+            
             <div className="mt-8 flex gap-3">
               <button 
                 onClick={() => setCustomizingItem(null)}
@@ -934,8 +968,11 @@ export default function KioskPage() {
                     return sum + (topping?.price ?? 0)
                   }, 0)
                   const bobaCost = bobaOption === 'Extra Boba' ? 1.00 : bobaOption === 'Regular Boba' ? 0.50 : 0
+                  
                   const totalPrice = baseCost + sizeUpcharge + milkUpcharge + toppingsCost + bobaCost
-                  return `Add to Cart — $${totalPrice.toFixed(2)}`
+                  const finalPrice = totalPrice * quantity
+
+                  return `Add ${quantity > 1 ? quantity + ' items' : 'to Cart'} — $${finalPrice.toFixed(2)}`
                 })()}
               </button>
             </div>
