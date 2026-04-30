@@ -933,18 +933,18 @@ export default function KioskPage() {
           }}>
             <div className="flex justify-between items-center">
               <span className="font-medium" style={{ color: 'var(--text-secondary)' }}>Subtotal</span>
-              <span>${cartSubtotal.toFixed(2)}</span>
+              <span translate="no" className="notranslate">${cartSubtotal.toFixed(2)}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="font-light" style={{ color: 'var(--text-muted)' }}>Tax (8.25%)</span>
-              <span className="font-light" >${cartTax.toFixed(2)}</span>
+              <span translate="no" className="notranslate">${cartTax.toFixed(2)}</span>
             </div>
 
             <div className="border-t mt-3 pt-3 flex justify-between items-center" style={{
               borderColor: 'var(--card-border)'
             }}>
               <span className="text-lg font-bold">Total</span>
-              <span className="text-2xl font-bold" style={{ color: 'var(--accent-color)' }}>${orderTotal.toFixed(2)}</span>
+              <span translate="no" className="notranslate" style={{ color: 'var(--accent-color)' }}>${orderTotal.toFixed(2)}</span>
             </div>
           </div>
 
