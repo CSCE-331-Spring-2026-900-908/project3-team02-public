@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from 'react'
 import { MenuItem, OrderItem, ChatSelections, ChatBobaOption, ChatCustomization } from './types'
 
 // Bot-facing update shape. Keys mirror ChatSelections plus a legacy `sugar`
-// alias so older prompt outputs still apply.
+// alias so older prompt outputs still apply. `addTopping`/`removeTopping`
+// let the bot do delta changes without knowing the current full list.
 type CustomizationUpdate = {
   size?: string
   temperature?: string
@@ -13,6 +14,8 @@ type CustomizationUpdate = {
   sugar?: string
   milk?: string
   toppings?: string[]
+  addTopping?: string
+  removeTopping?: string
   boba?: ChatBobaOption
 }
 
@@ -91,6 +94,13 @@ function applyUpdate(prev: ChatSelections, update: CustomizationUpdate): ChatSel
   else if (update.sugar !== undefined) next.sweetness = update.sugar
   if (update.milk !== undefined) next.milk = update.milk
   if (update.toppings !== undefined) next.toppings = update.toppings
+  if (update.addTopping) {
+    const cur = next.toppings ?? []
+    if (!cur.includes(update.addTopping)) next.toppings = [...cur, update.addTopping]
+  }
+  if (update.removeTopping) {
+    next.toppings = (next.toppings ?? []).filter(t => t !== update.removeTopping)
+  }
   if (update.boba !== undefined) next.boba = update.boba
   return next
 }
@@ -98,6 +108,18 @@ function applyUpdate(prev: ChatSelections, update: CustomizationUpdate): ChatSel
 export default function ChatWidget({ menuItems, cart, weather, customizationsByCategory, onAddToCart, onModifyCartLine, onSelectCategory, onRequestClose, textSize, highContrast }: ChatWidgetProps) {
   const customizations = customizationsByCategory ?? {}
   const [lastAdded, setLastAdded] = useState<LastAdded | null>(null)
+  const lastAddedRef = useRef<LastAdded | null>(null)
+  useEffect(() => {
+    lastAddedRef.current = lastAdded
+  }, [lastAdded])
+
+  function selectionsForAdd(item: MenuItem): ChatSelections {
+    const prev = lastAddedRef.current
+    if (prev && prev.itemId === item.itemid) {
+      return { ...prev.selections, toppings: [...(prev.selections.toppings ?? [])] }
+    }
+    return defaultSelectionsFor(item, customizations)
+  }
   const [isListening, setIsListening] = useState(false)
   const [speechSupported, setSpeechSupported] = useState(false)
   const recognitionRef = useRef<any>(null)
@@ -247,7 +269,7 @@ export default function ChatWidget({ menuItems, cart, weather, customizationsByC
           if (action.type === 'add') {
             const match = menuItems.find(i => i.itemid === action.itemId)
             if (match) {
-              const sel = defaultSelectionsFor(match, customizations)
+              const sel = selectionsForAdd(match)
               const newCartId = onAddToCart(match, sel)
               setLastAdded({
                 cartId: newCartId,
@@ -256,6 +278,16 @@ export default function ChatWidget({ menuItems, cart, weather, customizationsByC
                 drinkCategory: match.category,
                 selections: sel,
               })
+            }
+          } else if (action.type === 'modify') {
+            const prev = lastAddedRef.current
+            if (!prev) continue
+            const item = menuItems.find(i => i.itemid === prev.itemId)
+            if (!item) continue
+            const newSelections = applyUpdate(prev.selections, action.update ?? {})
+            const newCartId = onModifyCartLine(prev.cartId, item, newSelections)
+            if (newCartId) {
+              setLastAdded({ ...prev, cartId: newCartId, selections: newSelections })
             }
           }
         }
@@ -297,7 +329,7 @@ export default function ChatWidget({ menuItems, cart, weather, customizationsByC
     if (button.action === 'add_item') {
       const match = menuItems.find(i => i.itemid === button.itemId)
       if (!match) return
-      const sel = defaultSelectionsFor(match, customizations)
+      const sel = selectionsForAdd(match)
       const newCartId = onAddToCart(match, sel)
       setLastAdded({
         cartId: newCartId,
