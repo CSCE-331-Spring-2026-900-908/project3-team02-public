@@ -98,6 +98,8 @@ export default function CashierUI() {
   const [milkAlt, setMilkAlt] = useState<Customization | null>(null)
   const [selectedToppings, setSelectedToppings] = useState<Customization[]>([])
 
+  const [quantity, setQuantity] = useState(1)
+
   // New state for fetched customizations
   const [customizationsByCategory, setCustomizationsByCategory] = useState<{
     [key: string]: Customization[]
@@ -218,6 +220,7 @@ export default function CashierUI() {
         setSugarLevel(customizationsByCategory['Sweetness']?.[1] || customizationsByCategory['Sweetness']?.[0] || null)
         setMilkAlt(customizationsByCategory['Milk']?.[0] || null)
         setSelectedToppings([])
+        setQuantity(1)
   }
 
   function toggleTopping(topping: Customization) {
@@ -242,14 +245,14 @@ export default function CashierUI() {
       const existing = prev.find(o => o.cartId === cartId)
       if (existing) {
         return prev.map(o =>
-          o.cartId === cartId ? { ...o, qty: o.qty + 1 } : o
+          o.cartId === cartId ? { ...o, qty: o.qty + quantity } : o
         )
       }
       return [...prev, { 
         itemId: customizingItem.id, 
         itemName: customizingItem.name, 
         price: finalPrice, 
-        qty: 1,
+        qty: quantity,
         customizations: customString,
         cartId
       }]
@@ -465,10 +468,39 @@ export default function CashierUI() {
               )}
             </div>
 
+            <div className="flex flex-col gap-2 border-t border-gray-100 pt-5">
+              <span className="font-medium text-gray-500 text-sm uppercase tracking-wider">Quantity</span>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center border border-gray-200 rounded overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    className="w-10 h-10 flex items-center justify-center text-xl font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
+                  >
+                    −
+                  </button>
+                  <div className="w-12 h-10 flex items-center justify-center font-semibold text-gray-900 border-x border-gray-200 bg-white">
+                    {quantity}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setQuantity(quantity + 1)}
+                    className="w-10 h-10 flex items-center justify-center text-xl font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <div className="flex gap-3 mt-4 border-t border-gray-100 pt-5">
               <button onClick={() => setCustomizingItem(null)} className="flex-1 py-3 bg-white text-gray-600 border border-gray-200 font-medium text-base rounded hover:bg-gray-50 transition-colors">Cancel</button>
               <button onClick={confirmCustomization} className="flex-[2] py-3 bg-gray-900 text-white font-medium text-base rounded hover:bg-gray-800 transition-colors">
-                Add to Order (+${((drinkSize.price + milkAlt.price + selectedToppings.reduce((sum, t) => sum + t.price, 0)) + customizingItem.price).toFixed(2)})
+                {(() => {
+                  const unitPrice = customizingItem.price + drinkSize.price + milkAlt.price + selectedToppings.reduce((sum, t) => sum + t.price, 0);
+                  const totalPrice = unitPrice * quantity;
+                  return `Add ${quantity > 1 ? quantity + ' ' : ''}to Order (+$${totalPrice.toFixed(2)})`
+                })()}
               </button>
             </div>
           </div>
