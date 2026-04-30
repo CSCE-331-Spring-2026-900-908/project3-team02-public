@@ -61,24 +61,18 @@ type LastAdded = {
 
 function defaultSelectionsFor(
   item: MenuItem,
-  c: Record<string, ChatCustomization[]>
+  _c: Record<string, ChatCustomization[]>
 ): ChatSelections {
+  // Match the modal's hardcoded initial-state literals so chat-added defaults
+  // and modal-added defaults produce the same customString and merge in cart.
   const cat = (item.category || '').toLowerCase()
   const isMilkEligible = ['milk tea', 'fruit tea', 'specialty'].includes(cat)
-  const pick = (k: string, preferred?: string) => {
-    const opts = c[k] ?? []
-    if (preferred) {
-      const hit = opts.find(o => o.name === preferred)
-      if (hit) return hit.name
-    }
-    return opts[0]?.name
-  }
   return {
-    size: pick('Size', 'Medium') ?? 'Medium',
-    temperature: pick('Temperature', 'Cold') ?? 'Cold',
-    ice: pick('Ice', 'Normal Ice') ?? 'Normal Ice',
-    sweetness: pick('Sweetness', '100% (Regular) Sweetness') ?? '100% (Regular) Sweetness',
-    milk: isMilkEligible ? (pick('Milk', 'Whole Milk') ?? 'Whole Milk') : undefined,
+    size: 'Medium',
+    temperature: 'Cold',
+    ice: 'Normal Ice',
+    sweetness: '100% (Regular) Sweetness',
+    milk: isMilkEligible ? 'Whole Milk' : undefined,
     toppings: [],
     boba: isMilkEligible ? 'Regular Boba' : '',
   }

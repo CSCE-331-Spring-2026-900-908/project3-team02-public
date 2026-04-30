@@ -453,23 +453,16 @@ export default function KioskPage() {
   }
 
   function getDefaultChatSelections(item: MenuItem): ChatSelections {
+    // Match the modal's hardcoded initial-state literals so chat-added defaults
+    // and modal-added defaults produce the same customString and merge in cart.
     const cat = (item.category || '').toLowerCase()
     const isMilkEligible = ['milk tea', 'fruit tea', 'specialty'].includes(cat)
-    const c = customizationsByCategory
-    const pickName = (catKey: string, preferred?: string) => {
-      const opts = c[catKey] ?? []
-      if (preferred) {
-        const hit = opts.find(o => o.name === preferred)
-        if (hit) return hit.name
-      }
-      return opts[0]?.name
-    }
     return {
-      size: pickName('Size', 'Medium') ?? 'Medium',
-      temperature: pickName('Temperature', 'Cold') ?? 'Cold',
-      ice: pickName('Ice', 'Normal Ice') ?? 'Normal Ice',
-      sweetness: pickName('Sweetness', '100% (Regular) Sweetness') ?? '100% (Regular) Sweetness',
-      milk: isMilkEligible ? (pickName('Milk', 'Whole Milk') ?? 'Whole Milk') : undefined,
+      size: 'Medium',
+      temperature: 'Cold',
+      ice: 'Normal Ice',
+      sweetness: '100% (Regular) Sweetness',
+      milk: isMilkEligible ? 'Whole Milk' : undefined,
       toppings: [],
       boba: isMilkEligible ? 'Regular Boba' : '',
     }
@@ -480,14 +473,17 @@ export default function KioskPage() {
     const isMilkEligible = ['milk tea', 'fruit tea', 'specialty'].includes(cat)
     const c = customizationsByCategory
 
+    const effectiveToppings = isMilkEligible ? (sel.toppings ?? []) : []
+    const effectiveBoba = isMilkEligible ? sel.boba : ''
+
     const sizeUpcharge = c['Size']?.find(o => o.name === sel.size)?.price ?? 0
     const milkUpcharge = isMilkEligible && sel.milk
       ? (c['Milk']?.find(o => o.name === sel.milk)?.price ?? 0)
       : 0
-    const toppingsCost = (sel.toppings ?? []).reduce((sum, name) => {
+    const toppingsCost = effectiveToppings.reduce((sum, name) => {
       return sum + (c['Topping']?.find(o => o.name === name)?.price ?? 0)
     }, 0)
-    const bobaCost = sel.boba === 'Extra Boba' ? 1.00 : sel.boba === 'Regular Boba' ? 0.50 : 0
+    const bobaCost = effectiveBoba === 'Extra Boba' ? 1.00 : effectiveBoba === 'Regular Boba' ? 0.50 : 0
     const totalPrice = item.price + sizeUpcharge + milkUpcharge + toppingsCost + bobaCost
 
     const parts: string[] = []
@@ -496,12 +492,12 @@ export default function KioskPage() {
     if (sel.ice) parts.push(sel.ice)
     if (sel.sweetness) parts.push(sel.sweetness)
     if (isMilkEligible && sel.milk) parts.push(sel.milk)
-    if (sel.toppings && sel.toppings.length) parts.push(sel.toppings.join(', '))
-    if (sel.boba === 'Extra Boba') {
+    if (effectiveToppings.length) parts.push(effectiveToppings.join(', '))
+    if (effectiveBoba === 'Extra Boba') {
       parts.push('Regular Boba')
       parts.push('Extra Boba')
-    } else if (sel.boba) {
-      parts.push(sel.boba)
+    } else if (effectiveBoba) {
+      parts.push(effectiveBoba)
     }
     const customString = parts.join(', ')
     const cartId = `${item.itemid}-${customString}`
